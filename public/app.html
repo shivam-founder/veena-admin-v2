@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veena Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="logo">Veena Admin</div>
+      <nav id="nav">
+        <a href="#" data-section="dashboard" class="active">Dashboard</a>
+        <a href="#" data-section="songs">Songs</a>
+        <a href="#" data-section="albums">Albums</a>
+        <a href="#" data-section="notifications">Notifications</a>
+        <a href="#" data-section="users">Users</a>
+        <a href="#" data-section="songstracking">Songs Tracking</a>
+        <a href="#" data-section="userstracking">Users Tracking</a>
+        <a href="#" data-section="pageviews">Page Views</a>
+      </nav>
+      <button class="logout" id="logoutBtn">Logout</button>
+    </aside>
+    <main class="main">
+      <div id="content"></div>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
