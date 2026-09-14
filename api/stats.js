@@ -1,4 +1,5 @@
 const { createClient } = require("@supabase/supabase-js");
+const checkAuth = require("./_auth");
 const admin = require("firebase-admin");
 
 // Firebase init (push notifications wale env vars reuse)
