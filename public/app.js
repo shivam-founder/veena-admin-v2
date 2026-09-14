@@ -34,10 +34,8 @@ async function uploadFile(file, folder) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      fileName: file.name,
-      fileType: file.type,
-      fileBase64: base64,
-      folder: folder
+      fileName: file.name, fileType: file.type,
+      fileBase64: base64, folder: folder
     })
   });
   const data = await res.json();
@@ -50,101 +48,67 @@ let charts = {};
 
 function renderDashboard(data) {
   const s = data.stats;
-
   content.innerHTML = `
     <h2>Dashboard</h2>
     <p class="page-sub">Overview of your music platform</p>
-
     <div class="stat-grid">
       <div class="stat-card"><div class="label">Total Songs</div><div class="value">${s.totalSongs}</div></div>
       <div class="stat-card"><div class="label">Total Users</div><div class="value">${s.totalUsers}</div></div>
       <div class="stat-card"><div class="label">Total Listens</div><div class="value">${s.listensAll}</div></div>
       <div class="stat-card"><div class="label">Listens (7 days)</div><div class="value">${s.listens7d}</div></div>
     </div>
-
-    <div class="panel">
-      <h3>Listens — Last 7 Days</h3>
-      <div class="chart-wrap"><canvas id="chart7d"></canvas></div>
-    </div>
-
-    <div class="panel">
-      <h3>Page Views</h3>
-      <div class="chart-wrap"><canvas id="chartPages"></canvas></div>
-    </div>
-
+    <div class="panel"><h3>Listens — Last 7 Days</h3><div class="chart-wrap"><canvas id="chart7d"></canvas></div></div>
+    <div class="panel"><h3>Page Views</h3><div class="chart-wrap"><canvas id="chartPages"></canvas></div></div>
     <div class="panel">
       <h3>Top Played Songs</h3>
-      <table>
-        <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Listens</th><th>Unique</th></tr></thead>
-        <tbody>
-          ${data.topPlayed.length
-            ? data.topPlayed.map((r, i) => `
-              <tr><td>${i + 1}</td><td>${esc(r.title)}</td><td>${esc(r.artist)}</td>
-              <td><b>${r.listens}</b></td><td>${r.unique_listeners}</td></tr>`).join("")
-            : '<tr><td colspan="5" style="color:#888">No listens logged yet</td></tr>'}
-        </tbody>
-      </table>
+      <table><thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Listens</th><th>Unique</th></tr></thead><tbody>
+      ${data.topPlayed.length ? data.topPlayed.map((r, i) => `
+        <tr><td>${i + 1}</td><td>${esc(r.title)}</td><td>${esc(r.artist)}</td><td><b>${r.listens}</b></td><td>${r.unique_listeners}</td></tr>`).join("")
+        : '<tr><td colspan="5" style="color:#888">No listens logged yet</td></tr>'}
+      </tbody></table>
     </div>
-
     <div class="panel">
       <h3>Top Liked Songs</h3>
-      <table>
-        <thead><tr><th>#</th><th>Title</th><th>Likes</th></tr></thead>
-        <tbody>
-          ${data.topLiked.length
-            ? data.topLiked.map((r, i) => `
-              <tr><td>${i + 1}</td><td>${esc(r.title)}</td><td><b>${r.likes}</b></td></tr>`).join("")
-            : '<tr><td colspan="3" style="color:#888">No likes yet</td></tr>'}
-        </tbody>
-      </table>
+      <table><thead><tr><th>#</th><th>Title</th><th>Likes</th></tr></thead><tbody>
+      ${data.topLiked.length ? data.topLiked.map((r, i) => `
+        <tr><td>${i + 1}</td><td>${esc(r.title)}</td><td><b>${r.likes}</b></td></tr>`).join("")
+        : '<tr><td colspan="3" style="color:#888">No likes yet</td></tr>'}
+      </tbody></table>
     </div>
   `;
 
   Object.values(charts).forEach((c) => c.destroy());
   charts = {};
-
   const days = Object.keys(data.series7d);
-  const counts = Object.values(data.series7d);
 
   charts["7d"] = new Chart($("#chart7d"), {
     type: "line",
-    data: {
-      labels: days.map((d) => d.slice(5)),
-      datasets: [{
-        label: "Listens", data: counts,
+    data: { labels: days.map((d) => d.slice(5)),
+      datasets: [{ label: "Listens", data: Object.values(data.series7d),
         borderColor: "#2E4B2A", backgroundColor: "rgba(46,75,42,0.08)",
-        fill: true, tension: 0.35, pointRadius: 3
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
+        fill: true, tension: 0.35, pointRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-    }
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
   });
 
   charts["pages"] = new Chart($("#chartPages"), {
     type: "bar",
-    data: {
-      labels: data.pages.map((p) => p.page_name),
-      datasets: [{ label: "Views", data: data.pages.map((p) => p.views), backgroundColor: "#2E4B2A", borderRadius: 5 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
+    data: { labels: data.pages.map((p) => p.page_name),
+      datasets: [{ label: "Views", data: data.pages.map((p) => p.views), backgroundColor: "#2E4B2A", borderRadius: 5 }] },
+    options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-    }
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
   });
 }
 
-// ================= SONGS (full CRUD) =================
+// ================= SONGS =================
 let editingSongId = null;
 
 function renderSongs(songs) {
   content.innerHTML = `
     <h2>Songs</h2>
     <p class="page-sub">${songs.length} songs in your library</p>
-
     <div class="panel">
       <h3 id="formTitle">Add New Song</h3>
       <input type="text" id="songTitle" placeholder="Song title" style="max-width:400px">
@@ -160,32 +124,23 @@ function renderSongs(songs) {
       </div>
       <div id="songStatus" class="status"></div>
     </div>
-
     <div class="panel">
       <h3>All Songs</h3>
-      <table>
-        <thead><tr><th>Cover</th><th>Title</th><th>Artist</th><th>Album</th><th>Actions</th></tr></thead>
-        <tbody>
-          ${songs.length
-            ? songs.map((s) => `
-              <tr>
-                <td>${s.image_url
-                  ? `<img src="${esc(s.image_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">`
-                  : `<div style="width:36px;height:36px;border-radius:6px;background:#F0F0F0;"></div>`}</td>
-                <td><b>${esc(s.title)}</b></td>
-                <td>${esc(s.artist)}</td>
-                <td>${esc(s.album || "-")}</td>
-                <td>
-                  <button class="btn secondary" style="padding:6px 12px;" onclick='startEdit(${JSON.stringify({ id: s.id, title: s.title, artist: s.artist, album: s.album })})'>Edit</button>
-                  <button class="btn danger" style="padding:6px 12px;" onclick="deleteSong(${s.id}, '${esc(s.title)}')">Delete</button>
-                </td>
-              </tr>`).join("")
-            : '<tr><td colspan="5" style="color:#888">No songs yet!</td></tr>'}
-        </tbody>
-      </table>
+      <table><thead><tr><th>Cover</th><th>Title</th><th>Artist</th><th>Album</th><th>Actions</th></tr></thead><tbody>
+      ${songs.length ? songs.map((s) => `
+        <tr>
+          <td>${s.image_url ? `<img src="${esc(s.image_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">` : `<div style="width:36px;height:36px;border-radius:6px;background:#F0F0F0;"></div>`}</td>
+          <td><b>${esc(s.title)}</b></td>
+          <td>${esc(s.artist)}</td>
+          <td>${esc(s.album || "-")}</td>
+          <td>
+            <button class="btn secondary" style="padding:6px 12px;" onclick='startEdit(${JSON.stringify({ id: s.id, title: s.title, artist: s.artist, album: s.album })})'>Edit</button>
+            <button class="btn danger" style="padding:6px 12px;" onclick="deleteSong(${s.id}, '${esc(s.title)}')">Delete</button>
+          </td>
+        </tr>`).join("") : '<tr><td colspan="5" style="color:#888">No songs yet!</td></tr>'}
+      </tbody></table>
     </div>
   `;
-
   $("#saveSongBtn").addEventListener("click", saveSong);
   $("#cancelEditBtn").addEventListener("click", resetForm);
 }
@@ -204,14 +159,12 @@ async function saveSong() {
     status.textContent = "Title aur Artist zaroori hain!";
     return;
   }
-
   btn.disabled = true;
   status.className = "status success";
   status.textContent = "Working...";
 
   try {
-    let url = null;
-    let image_url = null;
+    let url = null, image_url = null;
     if (mp3) url = await uploadFile(mp3, "songs");
     if (image) image_url = await uploadFile(image, "images");
 
@@ -219,24 +172,16 @@ async function saveSong() {
       const updates = { title, artist, album };
       if (url) updates.url = url;
       if (image_url) updates.image_url = image_url;
-      await api("/api/songs", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingSongId, ...updates })
-      });
+      await api("/api/songs", { method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingSongId, ...updates }) });
       status.textContent = "Song updated!";
-      resetForm();
-      loadSongsSection();
+      resetForm(); loadSongsSection();
     } else {
       if (!url) throw new Error("MP3 file zaroori hai (naye song ke liye)!");
-      await api("/api/songs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, artist, album, url, image_url })
-      });
+      await api("/api/songs", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, artist, album, url, image_url }) });
       status.textContent = "Song added!";
-      resetForm();
-      loadSongsSection();
+      resetForm(); loadSongsSection();
     }
   } catch (e) {
     status.className = "status error";
@@ -248,11 +193,7 @@ async function saveSong() {
 function resetForm() {
   editingSongId = null;
   $("#formTitle").textContent = "Add New Song";
-  $("#songTitle").value = "";
-  $("#songArtist").value = "";
-  $("#songAlbum").value = "";
-  $("#songMp3").value = "";
-  $("#songImage").value = "";
+  ["songTitle","songArtist","songAlbum","songMp3","songImage"].forEach((id) => ($("#" + id).value = ""));
   $("#saveSongBtn").textContent = "Add Song";
   $("#cancelEditBtn").style.display = "none";
 }
@@ -263,8 +204,7 @@ function startEdit(song) {
   $("#songTitle").value = song.title;
   $("#songArtist").value = song.artist;
   $("#songAlbum").value = song.album || "";
-  $("#songMp3").value = "";
-  $("#songImage").value = "";
+  $("#songMp3").value = ""; $("#songImage").value = "";
   $("#saveSongBtn").textContent = "Update Song";
   $("#cancelEditBtn").style.display = "inline-block";
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -273,15 +213,10 @@ function startEdit(song) {
 async function deleteSong(id, title) {
   if (!confirm(`"${title}" ko delete karna hai?`)) return;
   try {
-    await api("/api/songs", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id })
-    });
+    await api("/api/songs", { method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }) });
     loadSongsSection();
-  } catch (e) {
-    alert("Delete failed: " + e.message);
-  }
+  } catch (e) { alert("Delete failed: " + e.message); }
 }
 
 async function loadSongsSection() {
@@ -290,7 +225,7 @@ async function loadSongsSection() {
   renderSongs(data.songs);
 }
 
-// ================= 🆕 ALBUMS (full CRUD) =================
+// ================= ALBUMS =================
 let editingAlbumId = null;
 
 async function loadAlbumsSection() {
@@ -301,7 +236,6 @@ async function loadAlbumsSection() {
   content.innerHTML = `
     <h2>Albums</h2>
     <p class="page-sub">${albums.length} albums</p>
-
     <div class="panel">
       <h3 id="albumFormTitle">Add New Album</h3>
       <input type="text" id="albumName" placeholder="Album name" style="max-width:400px">
@@ -313,31 +247,22 @@ async function loadAlbumsSection() {
       </div>
       <div id="albumStatus" class="status"></div>
     </div>
-
     <div class="panel">
       <h3>All Albums</h3>
-      <table>
-        <thead><tr><th>Cover</th><th>Name</th><th>Songs</th><th>Actions</th></tr></thead>
-        <tbody>
-          ${albums.length
-            ? albums.map((a) => `
-              <tr>
-                <td>${a.cover_url
-                  ? `<img src="${esc(a.cover_url)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;">`
-                  : `<div style="width:40px;height:40px;border-radius:6px;background:#F0F0F0;"></div>`}</td>
-                <td><b>${esc(a.name)}</b></td>
-                <td>${a.song_count}</td>
-                <td>
-                  <button class="btn secondary" style="padding:6px 12px;" onclick='startAlbumEdit(${JSON.stringify({ id: a.id, name: a.name })})'>Edit</button>
-                  <button class="btn danger" style="padding:6px 12px;" onclick="deleteAlbum(${a.id}, '${esc(a.name)}')">Delete</button>
-                </td>
-              </tr>`).join("")
-            : '<tr><td colspan="4" style="color:#888">No albums yet!</td></tr>'}
-        </tbody>
-      </table>
+      <table><thead><tr><th>Cover</th><th>Name</th><th>Songs</th><th>Actions</th></tr></thead><tbody>
+      ${albums.length ? albums.map((a) => `
+        <tr>
+          <td>${a.cover_url ? `<img src="${esc(a.cover_url)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;">` : `<div style="width:40px;height:40px;border-radius:6px;background:#F0F0F0;"></div>`}</td>
+          <td><b>${esc(a.name)}</b></td>
+          <td>${a.song_count}</td>
+          <td>
+            <button class="btn secondary" style="padding:6px 12px;" onclick='startAlbumEdit(${JSON.stringify({ id: a.id, name: a.name })})'>Edit</button>
+            <button class="btn danger" style="padding:6px 12px;" onclick="deleteAlbum(${a.id}, '${esc(a.name)}')">Delete</button>
+          </td>
+        </tr>`).join("") : '<tr><td colspan="4" style="color:#888">No albums yet!</td></tr>'}
+      </tbody></table>
     </div>
   `;
-
   $("#saveAlbumBtn").addEventListener("click", saveAlbum);
   $("#cancelAlbumEdit").addEventListener("click", resetAlbumForm);
 }
@@ -353,7 +278,6 @@ async function saveAlbum() {
     status.textContent = "Album name zaroori hai!";
     return;
   }
-
   btn.disabled = true;
   status.className = "status success";
   status.textContent = "Working...";
@@ -363,22 +287,15 @@ async function saveAlbum() {
     if (cover) cover_url = await uploadFile(cover, "images");
 
     if (editingAlbumId) {
-      await api("/api/albums", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingAlbumId, name, cover_url })
-      });
+      await api("/api/albums", { method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingAlbumId, name, cover_url }) });
       status.textContent = "Album updated!";
     } else {
-      await api("/api/albums", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, cover_url })
-      });
+      await api("/api/albums", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, cover_url }) });
       status.textContent = "Album added!";
     }
-    resetAlbumForm();
-    loadAlbumsSection();
+    resetAlbumForm(); loadAlbumsSection();
   } catch (e) {
     status.className = "status error";
     status.textContent = "Error: " + e.message;
@@ -389,8 +306,7 @@ async function saveAlbum() {
 function resetAlbumForm() {
   editingAlbumId = null;
   $("#albumFormTitle").textContent = "Add New Album";
-  $("#albumName").value = "";
-  $("#albumCover").value = "";
+  $("#albumName").value = ""; $("#albumCover").value = "";
   $("#saveAlbumBtn").textContent = "Add Album";
   $("#cancelAlbumEdit").style.display = "none";
 }
@@ -407,23 +323,17 @@ function startAlbumEdit(album) {
 async function deleteAlbum(id, name) {
   if (!confirm(`"${name}" album delete karna hai? (Songs delete NAHI honge)`)) return;
   try {
-    await api("/api/albums", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id })
-    });
+    await api("/api/albums", { method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }) });
     loadAlbumsSection();
-  } catch (e) {
-    alert("Delete failed: " + e.message);
-  }
+  } catch (e) { alert("Delete failed: " + e.message); }
 }
 
-// ================= 🆕 NOTIFICATIONS =================
+// ================= NOTIFICATIONS =================
 async function loadNotificationsSection() {
   content.innerHTML = `
     <h2>Notifications</h2>
     <p class="page-sub">Send push notifications to all users</p>
-
     <div class="panel">
       <h3>Compose Notification</h3>
       <input type="text" id="notifTitle" placeholder="Title (e.g. Naya gaana aa gaya!)" style="max-width:500px">
@@ -431,12 +341,10 @@ async function loadNotificationsSection() {
       <button class="btn" id="sendNotifBtn" style="max-width:200px;">Send Notification</button>
       <div id="notifStatus" class="status"></div>
     </div>
-
     <div class="panel">
       <h3>How it works</h3>
       <p style="font-size:13px; color:#666; line-height:1.7;">
         Notification sabhi registered devices par jayegi (Firebase Cloud Messaging).
-        User ne notifications disable kiye hain ya app uninstall ki hai to deliver nahi hogi.
         Frequency tip: roz zyada mat bhejo — sirf important updates ke liye use karo.
       </p>
     </div>
@@ -453,11 +361,9 @@ async function loadNotificationsSection() {
       status.textContent = "Title aur message dono bharo!";
       return;
     }
-
     btn.disabled = true;
     status.className = "status success";
     status.textContent = "Sending...";
-
     try {
       const res = await fetch("/api/notify", {
         method: "POST",
@@ -475,20 +381,116 @@ async function loadNotificationsSection() {
   });
 }
 
-// ================= STUBS =================
-const SECTION_NAMES = {
-  users: "Users",
-  songstracking: "Songs Tracking",
-  userstracking: "Users Tracking",
-  pageviews: "Page Views"
-};
+// ================= 🆕 SONGS TRACKING =================
+async function loadSongsTrackingSection() {
+  content.innerHTML = '<h2>Songs Tracking</h2><p class="page-sub">Loading...</p>';
+  const data = await api("/api/tracking?range=7");
 
-function renderStub(key) {
   content.innerHTML = `
-    <h2>${SECTION_NAMES[key]}</h2>
-    <p class="page-sub">Section coming in next phase</p>
-    <div class="panel" style="padding:40px; text-align:center; color:#888;">
-      This section is under construction.
+    <h2>Songs Tracking</h2>
+    <p class="page-sub">Listening activity — last ${data.days} days</p>
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="label">Total Listens (${data.days}d)</div><div class="value">${data.totals.totalListens}</div></div>
+      <div class="stat-card"><div class="label">Active Users (${data.days}d)</div><div class="value">${data.totals.activeUsers}</div></div>
+    </div>
+
+    <div class="panel">
+      <h3>Song Performance</h3>
+      <table>
+        <thead><tr><th>#</th><th>Song</th><th>Artist</th><th>Listens</th><th>Unique Listeners</th></tr></thead>
+        <tbody>
+          ${data.songTracking.length ? data.songTracking.map((r, i) => `
+            <tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td>${esc(r.artist)}</td>
+            <td><b>${r.listens}</b></td><td>${r.unique_listeners}</td></tr>`).join("")
+            : '<tr><td colspan="5" style="color:#888">Koi listen nahi hua abhi ${data.days} din me</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ================= 🆕 USERS TRACKING =================
+async function loadUsersTrackingSection() {
+  content.innerHTML = '<h2>Users Tracking</h2><p class="page-sub">Loading...</p>';
+  const data = await api("/api/tracking?range=7");
+
+  content.innerHTML = `
+    <h2>Users Tracking</h2>
+    <p class="page-sub">User activity — last ${data.days} days (privacy-safe: sirf counts)</p>
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="label">Active Users</div><div class="value">${data.totals.activeUsers}</div></div>
+      <div class="stat-card"><div class="label">Total Listens</div><div class="value">${data.totals.totalListens}</div></div>
+    </div>
+
+    <div class="panel">
+      <h3>Users by Activity</h3>
+      <table>
+        <thead><tr><th>#</th><th>User</th><th>Listens</th><th>Last Active</th><th>Status</th></tr></thead>
+        <tbody>
+          ${data.userTracking.length ? data.userTracking.map((r, i) => `
+            <tr><td>${i + 1}</td>
+            <td>${r.user_id === "anonymous" ? '<i style="color:#888">Guest user</i>' : `<code style="font-size:11px">${esc(r.user_id.slice(0, 12))}...</code>`}</td>
+            <td><b>${r.listens}</b></td>
+            <td>${r.last_active ? new Date(r.last_active).toLocaleString("en-IN") : "-"}</td>
+            <td>${r.status}</td></tr>`).join("")
+            : '<tr><td colspan="5" style="color:#888">Koi activity nahi abhi</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ================= 🆕 PAGE VIEWS =================
+async function loadPageViewsSection() {
+  content.innerHTML = '<h2>Page Views</h2><p class="page-sub">Loading...</p>';
+  const data = await api("/api/pageviews");
+  const pages = data.pages;
+  const maxViews = Math.max(...pages.map((p) => p.views), 1);
+
+  content.innerHTML = `
+    <h2>Page Views</h2>
+    <p class="page-sub">Kaunsi screen pe kitni baar gaye users (ads placement ke liye)</p>
+
+    <div class="panel">
+      <h3>Views by Page</h3>
+      ${pages.length ? pages.map((p) => `
+        <div class="bar-row">
+          <div class="bar-label">${esc(p.page_name)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.views / maxViews) * 100)}%"></div></div>
+          <div class="bar-value">${p.views}</div>
+        </div>`).join("")
+        : '<p style="color:#888; text-align:center; padding:20px;">Koi page view logged nahi abhi. App side tracking aane ke baad yahan data bharega.</p>'}
+    </div>
+  `;
+}
+
+// ================= USERS =================
+async function loadUsersSection() {
+  content.innerHTML = '<h2>Users</h2><p class="page-sub">Loading...</p>';
+  const data = await api("/api/users");
+  const users = data.users;
+
+  content.innerHTML = `
+    <h2>Users</h2>
+    <p class="page-sub">${users.length} registered users</p>
+    <div class="panel">
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Likes</th><th>Playlists</th><th>Joined</th></tr></thead>
+        <tbody>
+          ${users.length ? users.map((u, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td><b>${esc(u.name || "—")}</b></td>
+              <td>${esc(u.email || "—")}</td>
+              <td>${u.likes_count}</td>
+              <td>${u.playlists_count}</td>
+              <td>${new Date(u.created_at).toLocaleDateString("en-IN")}</td>
+            </tr>`).join("")
+            : '<tr><td colspan="6" style="color:#888">No users yet</td></tr>'}
+        </tbody>
+      </table>
     </div>
   `;
 }
@@ -499,20 +501,23 @@ function navigate(key) {
     a.classList.toggle("active", a.dataset.section === key);
   });
 
-  if (key === "dashboard") {
-    content.innerHTML = '<p class="page-sub">Loading dashboard...</p>';
-    api("/api/stats").then(renderDashboard).catch((e) => {
-      content.innerHTML = `<p class="page-sub" style="color:#C0392B">Error: ${esc(e.message)}</p>`;
-    });
-  } else if (key === "songs") {
-    loadSongsSection();
-  } else if (key === "albums") {
-    loadAlbumsSection();
-  } else if (key === "notifications") {
-    loadNotificationsSection();
-  } else {
-    renderStub(key);
-  }
+  const sections = {
+    dashboard: () => {
+      content.innerHTML = '<p class="page-sub">Loading dashboard...</p>';
+      api("/api/stats").then(renderDashboard).catch((e) => {
+        content.innerHTML = `<p class="page-sub" style="color:#C0392B">Error: ${esc(e.message)}</p>`;
+      });
+    },
+    songs: loadSongsSection,
+    albums: loadAlbumsSection,
+    notifications: loadNotificationsSection,
+    users: loadUsersSection,
+    songstracking: loadSongsTrackingSection,
+    userstracking: loadUsersTrackingSection,
+    pageviews: loadPageViewsSection
+  };
+
+  (sections[key] || (() => {}))();
 }
 
 document.querySelectorAll("#nav a").forEach((a) => {
