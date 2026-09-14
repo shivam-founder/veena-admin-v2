@@ -1,0 +1,201 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: #FAFAFA;
+  color: #1A1A1A;
+  font-size: 14px;
+}
+
+/* ---------- LOGIN ---------- */
+.login-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+.login-card {
+  background: #fff;
+  border: 1px solid #E5E5E5;
+  border-radius: 12px;
+  padding: 40px;
+  width: 360px;
+}
+.login-card h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.login-card .subtitle { color: #888; font-size: 13px; margin-bottom: 24px; }
+.login-card input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid #E5E5E5;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 14px;
+  font-family: inherit;
+}
+.login-card input:focus { outline: none; border-color: #2E4B2A; }
+.login-card button {
+  width: 100%;
+  padding: 11px;
+  background: #2E4B2A;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.login-card button:hover { background: #243D22; }
+.login-card button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ---------- LAYOUT ---------- */
+.layout { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 240px;
+  background: #fff;
+  border-right: 1px solid #E5E5E5;
+  position: fixed;
+  top: 0; bottom: 0; left: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0;
+}
+.sidebar .logo {
+  font-size: 17px;
+  font-weight: 700;
+  padding: 0 24px 20px;
+  border-bottom: 1px solid #F0F0F0;
+  margin-bottom: 12px;
+}
+.sidebar nav { flex: 1; }
+.sidebar nav a {
+  display: block;
+  padding: 10px 24px;
+  color: #555;
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-left: 2px solid transparent;
+}
+.sidebar nav a:hover { color: #1A1A1A; background: #FAFAFA; }
+.sidebar nav a.active {
+  color: #2E4B2A;
+  background: #F4F7F3;
+  border-left-color: #2E4B2A;
+  font-weight: 600;
+}
+.sidebar .logout {
+  margin: 0 24px;
+  padding: 9px;
+  background: none;
+  border: 1px solid #E5E5E5;
+  border-radius: 8px;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.sidebar .logout:hover { color: #1A1A1A; border-color: #ccc; }
+
+.main {
+  margin-left: 240px;
+  flex: 1;
+  padding: 32px 40px;
+}
+.main h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.main .page-sub { color: #888; font-size: 13px; margin-bottom: 28px; }
+
+/* ---------- COMPONENTS ---------- */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.stat-card {
+  background: #fff;
+  border: 1px solid #E5E5E5;
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+.stat-card .label { font-size: 12px; color: #888; margin-bottom: 6px; }
+.stat-card .value { font-size: 26px; font-weight: 700; }
+
+.panel {
+  background: #fff;
+  border: 1px solid #E5E5E5;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.panel h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+
+.chart-wrap { position: relative; height: 240px; }
+
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left;
+  font-size: 11.5px;
+  color: #888;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #E5E5E5;
+}
+td {
+  padding: 10px;
+  border-bottom: 1px solid #F5F5F5;
+  font-size: 13.5px;
+}
+tr:last-child td { border-bottom: none; }
+
+.bar-row { display: flex; align-items: center; margin-bottom: 10px; }
+.bar-label { width: 100px; font-size: 13px; color: #444; }
+.bar-track { flex: 1; height: 22px; background: #F5F5F5; border-radius: 5px; overflow: hidden; }
+.bar-fill {
+  height: 100%;
+  background: #2E4B2A;
+  border-radius: 5px;
+  min-width: 2px;
+}
+.bar-value { width: 60px; text-align: right; font-size: 13px; font-weight: 600; }
+
+.btn {
+  padding: 9px 16px;
+  background: #2E4B2A;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn:hover { background: #243D22; }
+.btn.secondary {
+  background: #fff;
+  color: #333;
+  border: 1px solid #E5E5E5;
+}
+.btn.danger { background: #fff; color: #C0392B; border: 1px solid #E5E5E5; }
+.btn.danger:hover { background: #FDF3F2; }
+
+input[type="text"], input[type="password"], select, textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #E5E5E5;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-family: inherit;
+  margin-bottom: 12px;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: #2E4B2A; }
+
+.status { font-size: 13px; margin-top: 10px; padding: 10px; border-radius: 8px; display: none; }
+.status.success { display: block; background: #F0F7F0; color: #2E4B2A; }
+.status.error { display: block; background: #FDF3F2; color: #C0392B; }
