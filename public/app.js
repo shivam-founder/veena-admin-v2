@@ -19,6 +19,32 @@ async function api(path, options) {
   return data;
 }
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadFile(file, folder) {
+  const base64 = await fileToBase64(file);
+  const res = await fetch("/api/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file.name,
+      fileType: file.type,
+      fileBase64: base64,
+      folder: folder
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Upload failed");
+  return data.url;
+}
+
 // ================= DASHBOARD =================
 let charts = {};
 
@@ -49,7 +75,7 @@ function renderDashboard(data) {
     <div class="panel">
       <h3>Top Played Songs</h3>
       <table>
-        <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Listens</th><th>Unique Listeners</th></tr></thead>
+        <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Listens</th><th>Unique</th></tr></thead>
         <tbody>
           ${data.topPlayed.length
             ? data.topPlayed.map((r, i) => `
@@ -85,18 +111,13 @@ function renderDashboard(data) {
     data: {
       labels: days.map((d) => d.slice(5)),
       datasets: [{
-        label: "Listens",
-        data: counts,
-        borderColor: "#2E4B2A",
-        backgroundColor: "rgba(46,75,42,0.08)",
-        fill: true,
-        tension: 0.35,
-        pointRadius: 3
+        label: "Listens", data: counts,
+        borderColor: "#2E4B2A", backgroundColor: "rgba(46,75,42,0.08)",
+        fill: true, tension: 0.35, pointRadius: 3
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
     }
@@ -106,23 +127,17 @@ function renderDashboard(data) {
     type: "bar",
     data: {
       labels: data.pages.map((p) => p.page_name),
-      datasets: [{
-        label: "Views",
-        data: data.pages.map((p) => p.views),
-        backgroundColor: "#2E4B2A",
-        borderRadius: 5
-      }]
+      datasets: [{ label: "Views", data: data.pages.map((p) => p.views), backgroundColor: "#2E4B2A", borderRadius: 5 }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
     }
   });
 }
 
-// ================= 🆕 SONGS SECTION (FULL CRUD) =================
+// ================= SONGS (full CRUD) =================
 let editingSongId = null;
 
 function renderSongs(songs) {
@@ -149,9 +164,7 @@ function renderSongs(songs) {
     <div class="panel">
       <h3>All Songs</h3>
       <table>
-        <thead>
-          <tr><th>Cover</th><th>Title</th><th>Artist</th><th>Album</th><th>Actions</th></tr>
-        </thead>
+        <thead><tr><th>Cover</th><th>Title</th><th>Artist</th><th>Album</th><th>Actions</th></tr></thead>
         <tbody>
           ${songs.length
             ? songs.map((s) => `
@@ -167,46 +180,16 @@ function renderSongs(songs) {
                   <button class="btn danger" style="padding:6px 12px;" onclick="deleteSong(${s.id}, '${esc(s.title)}')">Delete</button>
                 </td>
               </tr>`).join("")
-            : '<tr><td colspan="5" style="color:#888">No songs yet — add your first one above!</td></tr>'}
+            : '<tr><td colspan="5" style="color:#888">No songs yet!</td></tr>'}
         </tbody>
       </table>
     </div>
   `;
 
-  // ---- Form events ----
   $("#saveSongBtn").addEventListener("click", saveSong);
   $("#cancelEditBtn").addEventListener("click", resetForm);
 }
 
-// File ko base64 me convert
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-// File upload (Vercel API → Supabase Storage)
-async function uploadFile(file, folder) {
-  const base64 = await fileToBase64(file);
-  const res = await fetch("/api/upload", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fileName: file.name,
-      fileType: file.type,
-      fileBase64: base64,
-      folder: folder
-    })
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Upload failed");
-  return data.url;
-}
-
-// Song save (add ya edit)
 async function saveSong() {
   const btn = $("#saveSongBtn");
   const status = $("#songStatus");
@@ -224,36 +207,28 @@ async function saveSong() {
 
   btn.disabled = true;
   status.className = "status success";
-  status.textContent = "Working... please wait";
+  status.textContent = "Working...";
 
   try {
     let url = null;
     let image_url = null;
-
-    // Naye file upload (agar select ki hain)
     if (mp3) url = await uploadFile(mp3, "songs");
     if (image) image_url = await uploadFile(image, "images");
 
     if (editingSongId) {
-      // ---- EDIT MODE ----
       const updates = { title, artist, album };
       if (url) updates.url = url;
       if (image_url) updates.image_url = image_url;
-
       await api("/api/songs", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: editingSongId, ...updates })
       });
-
       status.textContent = "Song updated!";
       resetForm();
       loadSongsSection();
     } else {
-      // ---- ADD MODE ----
-      if (!url) {
-        throw new Error("MP3 file zaroori hai (naye song ke liye)!");
-      }
+      if (!url) throw new Error("MP3 file zaroori hai (naye song ke liye)!");
       await api("/api/songs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -309,20 +284,199 @@ async function deleteSong(id, title) {
   }
 }
 
-// Songs section load
 async function loadSongsSection() {
-  content.innerHTML = `
-    <h2>Songs</h2>
-    <p class="page-sub">Loading...</p>
-  `;
+  content.innerHTML = '<h2>Songs</h2><p class="page-sub">Loading...</p>';
   const data = await api("/api/songs");
   renderSongs(data.songs);
 }
 
+// ================= 🆕 ALBUMS (full CRUD) =================
+let editingAlbumId = null;
+
+async function loadAlbumsSection() {
+  content.innerHTML = '<h2>Albums</h2><p class="page-sub">Loading...</p>';
+  const data = await api("/api/albums");
+  const albums = data.albums;
+
+  content.innerHTML = `
+    <h2>Albums</h2>
+    <p class="page-sub">${albums.length} albums</p>
+
+    <div class="panel">
+      <h3 id="albumFormTitle">Add New Album</h3>
+      <input type="text" id="albumName" placeholder="Album name" style="max-width:400px">
+      <label style="font-size:12px; color:#888; display:block;">Cover Image (optional)</label>
+      <input type="file" id="albumCover" accept="image/jpeg,image/png,image/webp" style="max-width:400px">
+      <div style="margin-top:14px; display:flex; gap:10px;">
+        <button class="btn" id="saveAlbumBtn">Add Album</button>
+        <button class="btn secondary" id="cancelAlbumEdit" style="display:none;">Cancel</button>
+      </div>
+      <div id="albumStatus" class="status"></div>
+    </div>
+
+    <div class="panel">
+      <h3>All Albums</h3>
+      <table>
+        <thead><tr><th>Cover</th><th>Name</th><th>Songs</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${albums.length
+            ? albums.map((a) => `
+              <tr>
+                <td>${a.cover_url
+                  ? `<img src="${esc(a.cover_url)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;">`
+                  : `<div style="width:40px;height:40px;border-radius:6px;background:#F0F0F0;"></div>`}</td>
+                <td><b>${esc(a.name)}</b></td>
+                <td>${a.song_count}</td>
+                <td>
+                  <button class="btn secondary" style="padding:6px 12px;" onclick='startAlbumEdit(${JSON.stringify({ id: a.id, name: a.name })})'>Edit</button>
+                  <button class="btn danger" style="padding:6px 12px;" onclick="deleteAlbum(${a.id}, '${esc(a.name)}')">Delete</button>
+                </td>
+              </tr>`).join("")
+            : '<tr><td colspan="4" style="color:#888">No albums yet!</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  $("#saveAlbumBtn").addEventListener("click", saveAlbum);
+  $("#cancelAlbumEdit").addEventListener("click", resetAlbumForm);
+}
+
+async function saveAlbum() {
+  const btn = $("#saveAlbumBtn");
+  const status = $("#albumStatus");
+  const name = $("#albumName").value.trim();
+  const cover = $("#albumCover").files[0];
+
+  if (!name) {
+    status.className = "status error";
+    status.textContent = "Album name zaroori hai!";
+    return;
+  }
+
+  btn.disabled = true;
+  status.className = "status success";
+  status.textContent = "Working...";
+
+  try {
+    let cover_url = null;
+    if (cover) cover_url = await uploadFile(cover, "images");
+
+    if (editingAlbumId) {
+      await api("/api/albums", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingAlbumId, name, cover_url })
+      });
+      status.textContent = "Album updated!";
+    } else {
+      await api("/api/albums", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, cover_url })
+      });
+      status.textContent = "Album added!";
+    }
+    resetAlbumForm();
+    loadAlbumsSection();
+  } catch (e) {
+    status.className = "status error";
+    status.textContent = "Error: " + e.message;
+  }
+  btn.disabled = false;
+}
+
+function resetAlbumForm() {
+  editingAlbumId = null;
+  $("#albumFormTitle").textContent = "Add New Album";
+  $("#albumName").value = "";
+  $("#albumCover").value = "";
+  $("#saveAlbumBtn").textContent = "Add Album";
+  $("#cancelAlbumEdit").style.display = "none";
+}
+
+function startAlbumEdit(album) {
+  editingAlbumId = album.id;
+  $("#albumFormTitle").textContent = "Edit Album: " + album.name;
+  $("#albumName").value = album.name;
+  $("#albumCover").value = "";
+  $("#saveAlbumBtn").textContent = "Update Album";
+  $("#cancelAlbumEdit").style.display = "inline-block";
+}
+
+async function deleteAlbum(id, name) {
+  if (!confirm(`"${name}" album delete karna hai? (Songs delete NAHI honge)`)) return;
+  try {
+    await api("/api/albums", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    });
+    loadAlbumsSection();
+  } catch (e) {
+    alert("Delete failed: " + e.message);
+  }
+}
+
+// ================= 🆕 NOTIFICATIONS =================
+async function loadNotificationsSection() {
+  content.innerHTML = `
+    <h2>Notifications</h2>
+    <p class="page-sub">Send push notifications to all users</p>
+
+    <div class="panel">
+      <h3>Compose Notification</h3>
+      <input type="text" id="notifTitle" placeholder="Title (e.g. Naya gaana aa gaya!)" style="max-width:500px">
+      <textarea id="notifBody" placeholder="Message (e.g. Tere Liye ab Veena pe suno!)" rows="3" style="max-width:500px;"></textarea>
+      <button class="btn" id="sendNotifBtn" style="max-width:200px;">Send Notification</button>
+      <div id="notifStatus" class="status"></div>
+    </div>
+
+    <div class="panel">
+      <h3>How it works</h3>
+      <p style="font-size:13px; color:#666; line-height:1.7;">
+        Notification sabhi registered devices par jayegi (Firebase Cloud Messaging).
+        User ne notifications disable kiye hain ya app uninstall ki hai to deliver nahi hogi.
+        Frequency tip: roz zyada mat bhejo — sirf important updates ke liye use karo.
+      </p>
+    </div>
+  `;
+
+  $("#sendNotifBtn").addEventListener("click", async () => {
+    const btn = $("#sendNotifBtn");
+    const status = $("#notifStatus");
+    const title = $("#notifTitle").value.trim();
+    const body = $("#notifBody").value.trim();
+
+    if (!title || !body) {
+      status.className = "status error";
+      status.textContent = "Title aur message dono bharo!";
+      return;
+    }
+
+    btn.disabled = true;
+    status.className = "status success";
+    status.textContent = "Sending...";
+
+    try {
+      const res = await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, body })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Send failed");
+      status.textContent = `Sent to ${data.sent} devices! (${data.failed || 0} failed)`;
+    } catch (e) {
+      status.className = "status error";
+      status.textContent = "Error: " + e.message;
+    }
+    btn.disabled = false;
+  });
+}
+
 // ================= STUBS =================
 const SECTION_NAMES = {
-  albums: "Albums",
-  notifications: "Notifications",
   users: "Users",
   songstracking: "Songs Tracking",
   userstracking: "Users Tracking",
@@ -352,12 +506,15 @@ function navigate(key) {
     });
   } else if (key === "songs") {
     loadSongsSection();
+  } else if (key === "albums") {
+    loadAlbumsSection();
+  } else if (key === "notifications") {
+    loadNotificationsSection();
   } else {
     renderStub(key);
   }
 }
 
-// ---- Nav events ----
 document.querySelectorAll("#nav a").forEach((a) => {
   a.addEventListener("click", (e) => {
     e.preventDefault();
@@ -370,5 +527,4 @@ document.querySelectorAll("#nav a").forEach((a) => {
   window.location.href = "/";
 });
 
-// ---- Init ----
 navigate("dashboard");
