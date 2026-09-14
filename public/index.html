@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veena Admin — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <h1>Veena Admin</h1>
+    <p class="subtitle">Sign in to continue</p>
+    <input type="password" id="password" placeholder="Admin password" autocomplete="current-password">
+    <button id="loginBtn">Sign in</button>
+    <div id="loginStatus" class="status"></div>
+  </div>
+  <script>
+    document.getElementById("loginBtn").onclick = async () => {
+      const btn = document.getElementById("loginBtn");
+      const status = document.getElementById("loginStatus");
+      const password = document.getElementById("password").value;
+      if (!password) return;
+      btn.disabled = true;
+      btn.textContent = "Signing in...";
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password })
+        });
+        if (res.ok) {
+          window.location.href = "/app.html";
+        } else {
+          const data = await res.json();
+          status.className = "status error";
+          status.textContent = data.error || "Login failed";
+        }
+      } catch (e) {
+        status.className = "status error";
+        status.textContent = e.message;
+      }
+      btn.disabled = false;
+      btn.textContent = "Sign in";
+    };
+    document.getElementById("password").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("loginBtn").click();
+    });
+  </script>
+</body>
+</html>
