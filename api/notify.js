@@ -1,4 +1,5 @@
 const admin = require("firebase-admin");
+const checkAuth = require("./_auth");
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -10,13 +11,8 @@ if (!admin.apps.length) {
   });
 }
 
-const supabase = require("@supabase/supabase-js").createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
-
 module.exports = async (req, res) => {
-  if (!checkAuthWrapper(req, res)) return;
+  if (!checkAuth(req, res)) return;
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "POST only" });
@@ -28,8 +24,10 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const snap = await supabase.from("fcm_tokens").select("token");
-    const tokens = (snap.data || []).map((r) => r.token).filter(Boolean);
+    // Tokens FIRESTORE se (app wahan save karta hai)
+    const db = admin.firestore();
+    const snap = await db.collection("fcm_tokens").get();
+    const tokens = snap.docs.map((d) => d.data().token).filter(Boolean);
 
     if (tokens.length === 0) {
       return res.status(200).json({ sent: 0, failed: 0, message: "Koi device registered nahi" });
@@ -49,6 +47,3 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
-
-// Inline auth (kyunki _auth require ka path same folder me hai)
-const checkAuthWrapper = require("./_auth");
