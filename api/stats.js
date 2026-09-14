@@ -1,6 +1,6 @@
 const { createClient } = require("@supabase/supabase-js");
-const checkAuth = require("./_auth");
 const admin = require("firebase-admin");
+const checkAuth = require("./_auth");
 
 // Firebase init (push notifications wale env vars reuse)
 if (!admin.apps.length) {
@@ -107,6 +107,9 @@ async function totalUsers() {
 }
 
 module.exports = async (req, res) => {
+  // 🔒 Auth check — bina login pe 401
+  if (!checkAuth(req, res)) return;
+
   try {
     const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
 
