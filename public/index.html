@@ -10,15 +10,16 @@
 <body class="login-body">
   <div class="login-card">
     <h1>Veena Admin</h1>
-    <p class="subtitle">Sign in to continue</p>
+    <p class="subtitle">Sign in to manage your music platform</p>
     <input type="password" id="password" placeholder="Admin password" autocomplete="current-password">
     <button id="loginBtn">Sign in</button>
     <div id="loginStatus" class="status"></div>
   </div>
   <script>
-    document.getElementById("loginBtn").onclick = async () => {
-      const btn = document.getElementById("loginBtn");
-      const status = document.getElementById("loginStatus");
+    const btn = document.getElementById("loginBtn");
+    const status = document.getElementById("loginStatus");
+
+    async function doLogin() {
       const password = document.getElementById("password").value;
       if (!password) return;
       btn.disabled = true;
@@ -42,9 +43,11 @@
       }
       btn.disabled = false;
       btn.textContent = "Sign in";
-    };
+    }
+
+    btn.onclick = doLogin;
     document.getElementById("password").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") document.getElementById("loginBtn").click();
+      if (e.key === "Enter") doLogin();
     });
   </script>
 </body>
