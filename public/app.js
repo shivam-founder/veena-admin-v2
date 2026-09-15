@@ -109,6 +109,7 @@ function renderDashboard(data) {
 
     <div class="panel">
       <h3>Top Played Songs</h3>
+      <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Listens</th><th>Unique</th></tr></thead>
         <tbody>
@@ -119,10 +120,12 @@ function renderDashboard(data) {
             : '<tr><td colspan="5" style="color:var(--text-3)">No listens logged yet</td></tr>'}
         </tbody>
       </table>
+      </div>
     </div>
 
     <div class="panel">
       <h3>Top Liked Songs</h3>
+      <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>Title</th><th>Likes</th></tr></thead>
         <tbody>
@@ -132,6 +135,7 @@ function renderDashboard(data) {
             : '<tr><td colspan="3" style="color:var(--text-3)">No likes yet</td></tr>'}
         </tbody>
       </table>
+      </div>
     </div>
   `;
 
@@ -316,6 +320,7 @@ function renderSongs(songs, albums) {
 
     <div class="panel">
       <h3>All Songs</h3>
+      <div class="table-wrap">
       <table>
         <thead><tr><th style="width:56px;">Cover</th><th>Title</th><th>Artist</th><th>Album</th><th style="width:180px;">Actions</th></tr></thead>
         <tbody>
@@ -338,6 +343,7 @@ function renderSongs(songs, albums) {
             : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">No songs yet — add your first one above!</td></tr>'}
         </tbody>
       </table>
+      </div>
     </div>
   `;
 
@@ -431,12 +437,10 @@ async function loadSongsSection() {
   renderSongs(songsData.songs, albumsData.albums);
 }
 
-// ================= 🆕 ALBUMS (full CRUD + song management!) =================
+// ================= ALBUMS (full CRUD) =================
 let editingAlbumId = null;
-let currentAlbumDetailId = null;   // 🆕 detail view kaunsa khula hai
 
 async function loadAlbumsSection() {
-  currentAlbumDetailId = null;
   content.innerHTML = skeletonPage();
   const data = await api("/api/albums");
   const albums = data.albums;
@@ -456,9 +460,10 @@ async function loadAlbumsSection() {
       <div id="albumStatus" class="status"></div>
     </div>
     <div class="panel">
-      <h3>All Albums — click to manage songs</h3>
+      <h3>All Albums</h3>
+      <div class="table-wrap">
       <table>
-        <thead><tr><th style="width:60px;">Cover</th><th>Name</th><th>Songs</th><th style="width:180px;">Actions</th></tr></thead>
+        <thead><tr><th style="width:60px;">Cover</th><th>Name</th><th>Songs</th><th style="width:220px;">Actions</th></tr></thead>
         <tbody>
         ${albums.length ? albums.map((a) => `
           <tr>
@@ -472,6 +477,7 @@ async function loadAlbumsSection() {
             </td>
           </tr>`).join("") : '<tr><td colspan="4" style="color:var(--text-3); text-align:center; padding:30px;">No albums yet!</td></tr>'}
         </tbody></table>
+      </div>
     </div>
   `;
   $("#saveAlbumBtn").addEventListener("click", saveAlbum);
@@ -530,7 +536,7 @@ function startAlbumEdit(album) {
 }
 
 async function deleteAlbum(id, name) {
-  if (!confirm(`"${name}" album delete karna hai? (Songs delete NAHI honge, bas unlink honge)`)) return;
+  if (!confirm(`"${name}" album delete karna hai? (Songs delete NAHI honge)`)) return;
   try {
     await api("/api/albums", { method: "DELETE", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }) });
@@ -538,12 +544,11 @@ async function deleteAlbum(id, name) {
   } catch (e) { alert("Delete failed: " + e.message); }
 }
 
-// ================= 🆕 ALBUM DETAIL (songs add/remove!) =================
+// ================= 🆕 ALBUM DETAIL (songs add/remove) =================
 async function openAlbumDetail(albumId) {
   currentAlbumDetailId = albumId;
   content.innerHTML = '<h2>Loading...</h2><p class="page-sub">Please wait</p>';
 
-  // Albums + songs dono laо
   const [albumsData, songsData] = await Promise.all([
     api("/api/albums"),
     api("/api/songs")
@@ -571,6 +576,7 @@ async function openAlbumDetail(albumId) {
     <div class="panel">
       <h3>Songs in this album (${albumSongs.length})</h3>
       ${albumSongs.length ? `
+      <div class="table-wrap">
       <table>
         <thead><tr><th style="width:50px;">Cover</th><th>Title</th><th>Artist</th><th style="width:110px;">Remove</th></tr></thead>
         <tbody>
@@ -583,12 +589,14 @@ async function openAlbumDetail(albumId) {
               <td><button class="btn danger" style="padding:6px 12px;" onclick="removeSongFromAlbum(${s.id})">Remove</button></td>
             </tr>`).join("")}
         </tbody>
-      </table>` : '<p style="color:var(--text-3); padding:12px 0;">Is album me abhi koi gaana nahi. Neeche se add karo!</p>'}
+      </table>
+      </div>` : '<p style="color:var(--text-3); padding:12px 0;">Is album me abhi koi gaana nahi. Neeche se add karo!</p>'}
     </div>
 
     <div class="panel">
       <h3>Add songs to this album (${outsideSongs.length} available)</h3>
       ${outsideSongs.length ? `
+      <div class="table-wrap">
       <table>
         <thead><tr><th style="width:50px;">Cover</th><th>Title</th><th>Artist</th><th style="width:110px;">Add</th></tr></thead>
         <tbody>
@@ -601,7 +609,8 @@ async function openAlbumDetail(albumId) {
               <td><button class="btn" style="padding:6px 14px;" onclick="addSongToAlbum(${s.id})">Add</button></td>
             </tr>`).join("")}
         </tbody>
-      </table>` : '<p style="color:var(--text-3); padding:12px 0;">Saare songs already is album me hain! 🎉</p>'}
+      </table>
+      </div>` : '<p style="color:var(--text-3); padding:12px 0;">Saare songs already is album me hain!</p>'}
     </div>
 
     <button class="btn secondary" onclick="loadAlbumsSection()">← Back to Albums</button>
@@ -626,7 +635,6 @@ async function openAlbumDetail(albumId) {
   });
 }
 
-// Song ko album me add (PUT — sirf album_id set)
 async function addSongToAlbum(songId) {
   try {
     await api("/api/songs", {
@@ -634,13 +642,12 @@ async function addSongToAlbum(songId) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: songId, album_id: currentAlbumDetailId })
     });
-    openAlbumDetail(currentAlbumDetailId);   // refresh detail
+    openAlbumDetail(currentAlbumDetailId);
   } catch (e) {
     alert("Add failed: " + e.message);
   }
 }
 
-// Song ko album se remove (PUT — album_id null)
 async function removeSongFromAlbum(songId) {
   try {
     await api("/api/songs", {
@@ -731,6 +738,7 @@ async function loadSongsTrackingSection() {
     </div>
     <div class="panel">
       <h3>Song Performance</h3>
+      <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>Song</th><th>Artist</th><th>Listens</th><th>Unique Listeners</th></tr></thead>
         <tbody id="trackTableBody">
@@ -740,6 +748,7 @@ async function loadSongsTrackingSection() {
             : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi listen nahi hua abhi</td></tr>'}
         </tbody>
       </table>
+      </div>
     </div>
   `;
 }
@@ -762,6 +771,7 @@ async function loadUsersTrackingSection() {
     </div>
     <div class="panel">
       <h3>Users by Activity</h3>
+      <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>User</th><th>Listens</th><th>Last Active</th><th>Status</th></tr></thead>
         <tbody>
@@ -786,6 +796,7 @@ async function loadUsersTrackingSection() {
             : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi activity nahi abhi</td></tr>'}
         </tbody>
       </table>
+      </div>
     </div>
   `;
 }
@@ -828,6 +839,7 @@ async function loadUsersSection() {
     <h2>Users</h2>
     <p class="page-sub">${users.length} registered users</p>
     <div class="panel">
+      <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Likes</th><th>Playlists</th><th>Joined</th></tr></thead>
         <tbody>
@@ -842,6 +854,7 @@ async function loadUsersSection() {
           </tr>`).join("")
           : '<tr><td colspan="6" style="color:var(--text-3); text-align:center; padding:30px;">No users yet</td></tr>'}
         </tbody></table>
+      </div>
     </div>
   `;
 }
@@ -849,7 +862,12 @@ async function loadUsersSection() {
 // ================= ROUTER =================
 function navigate(key) {
   currentSection = key;
+  // Desktop sidebar sync
   document.querySelectorAll("#nav a").forEach((a) => {
+    a.classList.toggle("active", a.dataset.section === key);
+  });
+  // 🆕 Mobile bottom nav sync
+  document.querySelectorAll("#bottomNav a").forEach((a) => {
     a.classList.toggle("active", a.dataset.section === key);
   });
 
@@ -874,12 +892,31 @@ document.querySelectorAll("#nav a").forEach((a) => {
   });
 });
 
+// 🆕 Mobile bottom nav events
+document.querySelectorAll("#bottomNav a").forEach((a) => {
+  a.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (a.id === "logoutBtnMobile") return;   // logout alag handle hoga
+    navigate(a.dataset.section);
+  });
+});
+
  $("#logoutBtn").addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" }).catch(() => {});
   window.location.href = "/";
 });
 
-// ================= REALTIME =================
+// 🆕 Mobile logout
+const logoutMobile = $("#logoutBtnMobile");
+if (logoutMobile) {
+  logoutMobile.addEventListener("click", async (e) => {
+    e.preventDefault();
+    await fetch("/api/logout", { method: "POST" }).catch(() => {});
+    window.location.href = "/";
+  });
+}
+
+// ================= REALTIME (surgical — no full refresh!) =================
 try {
   const SUPA = supabase.createClient(
     "https://thxoguhlrqrrnqwtyqkg.supabase.co",
