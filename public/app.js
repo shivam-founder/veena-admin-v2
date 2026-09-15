@@ -618,7 +618,7 @@ async function loadSongsTrackingSection() {
   `;
 }
 
-// ================= USERS TRACKING =================
+// ================= USERS TRACKING (naam/email ke saath) =================
 async function loadUsersTrackingSection() {
   content.innerHTML = `
     <h2>Users Tracking</h2>
@@ -639,12 +639,25 @@ async function loadUsersTrackingSection() {
       <table>
         <thead><tr><th>#</th><th>User</th><th>Listens</th><th>Last Active</th><th>Status</th></tr></thead>
         <tbody>
-          ${data.userTracking.length ? data.userTracking.map((r, i) => `
+          ${data.userTracking.length ? data.userTracking.map((r, i) => {
+            // 🆕 Naam/email dikhao — na ho to UUID chhota karke
+            let userDisplay;
+            if (r.user_id === "anonymous") {
+              userDisplay = '<span class="badge gray">Guest</span>';
+            } else if (r.name) {
+              userDisplay = `<b>${esc(r.name)}</b><br><span style="font-size:11px; color:var(--text-3)">${esc(r.email)}</span>`;
+            } else if (r.email) {
+              userDisplay = `<b>${esc(r.email)}</b>`;
+            } else {
+              userDisplay = `<code>${esc(r.user_id.slice(0, 12))}...</code>`;
+            }
+            return `
             <tr><td>${i + 1}</td>
-            <td>${r.user_id === "anonymous" ? '<span class="badge gray">Guest</span>' : `<code>${esc(r.user_id.slice(0, 12))}...</code>`}</td>
+            <td>${userDisplay}</td>
             <td><span class="badge green">${r.listens}</span></td>
             <td>${r.last_active ? new Date(r.last_active).toLocaleString("en-IN") : "—"}</td>
-            <td><span class="badge gray">${r.status}</span></td></tr>`).join("")
+            <td><span class="badge gray">${r.status}</span></td></tr>`;
+          }).join("")
             : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi activity nahi abhi</td></tr>'}
         </tbody>
       </table>
