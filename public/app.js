@@ -605,6 +605,12 @@ function navigate(key) {
     a.classList.toggle("active", a.dataset.section === key);
   });
 
+  function navigate(key) {
+  window.currentSection = key;   // 🆕 realtime listener isko padhta hai
+  document.querySelectorAll("#nav a").forEach((a) => {
+    a.classList.toggle("active", a.dataset.section === key);
+  });
+
   const sections = {
     dashboard: () => {
       content.innerHTML = skeletonDashboard();
