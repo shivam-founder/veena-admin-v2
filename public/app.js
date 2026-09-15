@@ -431,10 +431,12 @@ async function loadSongsSection() {
   renderSongs(songsData.songs, albumsData.albums);
 }
 
-// ================= ALBUMS (full CRUD) =================
+// ================= 🆕 ALBUMS (full CRUD + song management!) =================
 let editingAlbumId = null;
+let currentAlbumDetailId = null;   // 🆕 detail view kaunsa khula hai
 
 async function loadAlbumsSection() {
+  currentAlbumDetailId = null;
   content.innerHTML = skeletonPage();
   const data = await api("/api/albums");
   const albums = data.albums;
@@ -454,7 +456,7 @@ async function loadAlbumsSection() {
       <div id="albumStatus" class="status"></div>
     </div>
     <div class="panel">
-      <h3>All Albums</h3>
+      <h3>All Albums — click to manage songs</h3>
       <table>
         <thead><tr><th style="width:60px;">Cover</th><th>Name</th><th>Songs</th><th style="width:180px;">Actions</th></tr></thead>
         <tbody>
@@ -464,6 +466,7 @@ async function loadAlbumsSection() {
             <td><b>${esc(a.name)}</b></td>
             <td><span class="badge gray">${a.song_count} songs</span></td>
             <td>
+              <button class="btn" style="padding:7px 14px;" onclick="openAlbumDetail(${a.id})">Manage Songs</button>
               <button class="btn secondary" style="padding:7px 14px;" onclick='startAlbumEdit(${JSON.stringify({ id: a.id, name: a.name })})'>Edit</button>
               <button class="btn danger" style="padding:7px 14px;" onclick="deleteAlbum(${a.id}, '${esc(a.name)}')">Delete</button>
             </td>
@@ -527,12 +530,128 @@ function startAlbumEdit(album) {
 }
 
 async function deleteAlbum(id, name) {
-  if (!confirm(`"${name}" album delete karna hai? (Songs delete NAHI honge)`)) return;
+  if (!confirm(`"${name}" album delete karna hai? (Songs delete NAHI honge, bas unlink honge)`)) return;
   try {
     await api("/api/albums", { method: "DELETE", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }) });
     loadAlbumsSection();
   } catch (e) { alert("Delete failed: " + e.message); }
+}
+
+// ================= 🆕 ALBUM DETAIL (songs add/remove!) =================
+async function openAlbumDetail(albumId) {
+  currentAlbumDetailId = albumId;
+  content.innerHTML = '<h2>Loading...</h2><p class="page-sub">Please wait</p>';
+
+  // Albums + songs dono laо
+  const [albumsData, songsData] = await Promise.all([
+    api("/api/albums"),
+    api("/api/songs")
+  ]);
+  const album = albumsData.albums.find((a) => a.id === albumId);
+  if (!album) {
+    content.innerHTML = '<h2>Album not found</h2>';
+    return;
+  }
+  const allSongs = songsData.songs;
+  const albumSongs = allSongs.filter((s) => s.album_id === albumId);
+  const outsideSongs = allSongs.filter((s) => s.album_id !== albumId);
+
+  content.innerHTML = `
+    <h2>${esc(album.name)}</h2>
+    <p class="page-sub">Album detail — yahan se songs add/remove karo</p>
+
+    <div class="panel">
+      <h3>Album Settings</h3>
+      <input type="text" id="detailAlbumName" value="${esc(album.name)}" style="max-width:420px">
+      <button class="btn" id="updateAlbumNameBtn" style="max-width:220px;">Update Name</button>
+      <div id="detailStatus" class="status"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Songs in this album (${albumSongs.length})</h3>
+      ${albumSongs.length ? `
+      <table>
+        <thead><tr><th style="width:50px;">Cover</th><th>Title</th><th>Artist</th><th style="width:110px;">Remove</th></tr></thead>
+        <tbody>
+          ${albumSongs.map((s) => `
+            <tr>
+              <td>${s.image_url
+                ? `<img src="${esc(s.image_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">`
+                : `<div style="width:36px;height:36px;border-radius:6px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">${esc(s.title[0]?.toUpperCase() || "?")}</div>`}</td>
+              <td><b>${esc(s.title)}</b><br><span style="font-size:12px; color:var(--text-3)">${esc(s.artist)}</span></td>
+              <td><button class="btn danger" style="padding:6px 12px;" onclick="removeSongFromAlbum(${s.id})">Remove</button></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>` : '<p style="color:var(--text-3); padding:12px 0;">Is album me abhi koi gaana nahi. Neeche se add karo!</p>'}
+    </div>
+
+    <div class="panel">
+      <h3>Add songs to this album (${outsideSongs.length} available)</h3>
+      ${outsideSongs.length ? `
+      <table>
+        <thead><tr><th style="width:50px;">Cover</th><th>Title</th><th>Artist</th><th style="width:110px;">Add</th></tr></thead>
+        <tbody>
+          ${outsideSongs.map((s) => `
+            <tr>
+              <td>${s.image_url
+                ? `<img src="${esc(s.image_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">`
+                : `<div style="width:36px;height:36px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-3);font-weight:700;">${esc(s.title[0]?.toUpperCase() || "?")}</div>`}</td>
+              <td><b>${esc(s.title)}</b><br><span style="font-size:12px; color:var(--text-3)">${esc(s.artist)}</span></td>
+              <td><button class="btn" style="padding:6px 14px;" onclick="addSongToAlbum(${s.id})">Add</button></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>` : '<p style="color:var(--text-3); padding:12px 0;">Saare songs already is album me hain! 🎉</p>'}
+    </div>
+
+    <button class="btn secondary" onclick="loadAlbumsSection()">← Back to Albums</button>
+  `;
+
+  $("#updateAlbumNameBtn").addEventListener("click", async () => {
+    const name = $("#detailAlbumName").value.trim();
+    const status = $("#detailStatus");
+    if (!name) {
+      status.className = "status error";
+      status.textContent = "Naam khali nahi ho sakta!";
+      return;
+    }
+    await api("/api/albums", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: albumId, name })
+    });
+    status.className = "status success";
+    status.textContent = "Name updated!";
+    loadAlbumsSection();
+  });
+}
+
+// Song ko album me add (PUT — sirf album_id set)
+async function addSongToAlbum(songId) {
+  try {
+    await api("/api/songs", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: songId, album_id: currentAlbumDetailId })
+    });
+    openAlbumDetail(currentAlbumDetailId);   // refresh detail
+  } catch (e) {
+    alert("Add failed: " + e.message);
+  }
+}
+
+// Song ko album se remove (PUT — album_id null)
+async function removeSongFromAlbum(songId) {
+  try {
+    await api("/api/songs", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: songId, album_id: null })
+    });
+    openAlbumDetail(currentAlbumDetailId);
+  } catch (e) {
+    alert("Remove failed: " + e.message);
+  }
 }
 
 // ================= NOTIFICATIONS =================
@@ -760,7 +879,7 @@ document.querySelectorAll("#nav a").forEach((a) => {
   window.location.href = "/";
 });
 
-// ================= REALTIME (surgical — no full refresh!) =================
+// ================= REALTIME =================
 try {
   const SUPA = supabase.createClient(
     "https://thxoguhlrqrrnqwtyqkg.supabase.co",
@@ -775,16 +894,6 @@ try {
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "page_views" }, (payload) => {
       const page = payload.new?.page_name || "unknown";
       liveUpdateOnPageView(page);
-    })
-    .on("postgres_changes", { event: "*", schema: "public", table: "songs" }, () => {
-      if (currentSection === "songs") {
-        loadSongsSection();
-      }
-    })
-    .on("postgres_changes", { event: "*", schema: "public", table: "albums" }, () => {
-      if (currentSection === "albums") {
-        loadAlbumsSection();
-      }
     })
     .subscribe();
 } catch (e) {
