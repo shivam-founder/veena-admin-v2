@@ -44,7 +44,7 @@ async function uploadFile(file, folder) {
   return data.url;
 }
 
-// ================= SKELETONS (sirf manual navigation pe) =================
+// ================= SKELETONS =================
 function skeletonDashboard() {
   return `
     <h2>Dashboard</h2>
@@ -70,12 +70,13 @@ function skeletonPage() {
   return `<h2>Loading...</h2><p class="page-sub">Please wait</p>${skeletonTable(6)}`;
 }
 
-// ================= LIVE DATA STORE (surgical updates ke liye) =================
+// ================= LIVE DATA STORE =================
 const live = {
   stats: { totalSongs: 0, totalUsers: 0, listensAll: 0, listens7d: 0 },
   series7d: {},
   pages: [],
-  charts: {}   // yahan charts hain — ab `charts` variable ki jagah
+  charts: {},
+  trackTotals: null
 };
 
 // ================= DASHBOARD =================
@@ -87,7 +88,7 @@ function renderDashboard(data) {
 
   content.innerHTML = `
     <h2>Dashboard</h2>
-    <p class="page-sub">Overview of your music platform <span class="badge green" id="liveBadge">● LIVE</span></p>
+    <p class="page-sub">Overview of your music platform <span class="badge green">● LIVE</span></p>
 
     <div class="stat-grid">
       <div class="stat-card"><div class="label">Total Songs</div><div class="value" id="statSongs">${s.totalSongs}</div></div>
@@ -191,21 +192,17 @@ function renderDashboard(data) {
   });
 }
 
-// ================= 🆕 SURGICAL LIVE UPDATES (no re-render!) =================
-
-// Listen aayi → sirf numbers + chart point update
+// ================= SURGICAL LIVE UPDATES =================
 function liveUpdateOnListen() {
   if (currentSection === "dashboard") {
     live.stats.listensAll++;
     live.stats.listens7d++;
 
-    // Stat values patch (sirf text change — no re-render!)
     const elAll = $("#statListens");
     const el7d = $("#statListens7d");
     if (elAll) elAll.textContent = live.stats.listensAll;
     if (el7d) el7d.textContent = live.stats.listens7d;
 
-    // Chart me aaj ka point +1
     const today = new Date().toISOString().slice(0, 10);
     if (live.series7d[today] !== undefined) {
       live.series7d[today]++;
@@ -214,26 +211,22 @@ function liveUpdateOnListen() {
         const idx = chart.data.labels.indexOf(today.slice(5));
         if (idx >= 0) {
           chart.data.datasets[0].data[idx] = live.series7d[today];
-          chart.update("none");   // no animation flash
+          chart.update("none");
         }
       }
     }
   }
 
-  // Songs Tracking section me counter live increment
   if (currentSection === "songstracking") {
     const el = $("#trackTotalListens");
-    if (el) {
-      live.trackTotals = live.trackTotals || { totalListens: 0, activeUsers: 0 };
+    if (el && live.trackTotals) {
       live.trackTotals.totalListens++;
       el.textContent = live.trackTotals.totalListens;
     }
   }
 }
 
-// Page view aaya → sirf bar update
 function liveUpdateOnPageView(pageName) {
-  // Live store me increment
   let found = false;
   live.pages.forEach((p) => {
     if (p.page_name === pageName) { p.views++; found = true; }
@@ -256,7 +249,6 @@ function liveUpdateOnPageView(pageName) {
   }
 
   if (currentSection === "pageviews") {
-    // Bar width/value patch — pure section re-render nahi
     const rows = document.querySelectorAll(".bar-row");
     for (const row of rows) {
       const label = row.querySelector(".bar-label")?.textContent;
@@ -272,7 +264,6 @@ function liveUpdateOnPageView(pageName) {
         return;
       }
     }
-    // Naya page tha — nayi bar row append karo
     const wrap = document.querySelector(".panel div");
     if (wrap) {
       const p = live.pages.find((x) => x.page_name === pageName);
@@ -296,18 +287,22 @@ function loadDashboard() {
   });
 }
 
-// ================= SONGS =================
+// ================= SONGS (full CRUD + album dropdown) =================
 let editingSongId = null;
 
-function renderSongs(songs) {
+function renderSongs(songs, albums) {
   content.innerHTML = `
     <h2>Songs</h2>
     <p class="page-sub">${songs.length} songs in your library</p>
+
     <div class="panel">
       <h3 id="formTitle">Add New Song</h3>
       <input type="text" id="songTitle" placeholder="Song title" style="max-width:420px">
       <input type="text" id="songArtist" placeholder="Artist name" style="max-width:420px">
-      <input type="text" id="songAlbum" placeholder="Album name (optional)" style="max-width:420px">
+      <select id="songAlbumId" style="max-width:420px;">
+        <option value="">— No album —</option>
+        ${albums.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("")}
+      </select>
       <label style="font-size:12px; color:var(--text-3); display:block; margin-top:4px;">MP3 File</label>
       <input type="file" id="songMp3" accept="audio/mpeg" style="max-width:420px">
       <label style="font-size:12px; color:var(--text-3); display:block; margin-top:8px;">Cover Image (optional)</label>
@@ -318,29 +313,34 @@ function renderSongs(songs) {
       </div>
       <div id="songStatus" class="status"></div>
     </div>
+
     <div class="panel">
       <h3>All Songs</h3>
       <table>
         <thead><tr><th style="width:56px;">Cover</th><th>Title</th><th>Artist</th><th>Album</th><th style="width:180px;">Actions</th></tr></thead>
         <tbody>
-          ${songs.length ? songs.map((s) => `
+          ${songs.length ? songs.map((s) => {
+            const albumName = albums.find((a) => a.id === s.album_id)?.name || s.album || "—";
+            return `
             <tr>
               <td>${s.image_url
                 ? `<img src="${esc(s.image_url)}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid var(--border);">`
                 : `<div style="width:40px;height:40px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">${esc(s.title[0]?.toUpperCase() || "?")}</div>`}</td>
               <td><b>${esc(s.title)}</b></td>
               <td>${esc(s.artist)}</td>
-              <td>${esc(s.album) || '<span style="color:var(--text-3)">—</span>'}</td>
+              <td>${esc(albumName)}</td>
               <td>
-                <button class="btn secondary" style="padding:7px 14px;" onclick='startEdit(${JSON.stringify({ id: s.id, title: s.title, artist: s.artist, album: s.album })})'>Edit</button>
+                <button class="btn secondary" style="padding:7px 14px;" onclick='startEdit(${JSON.stringify({ id: s.id, title: s.title, artist: s.artist, album: s.album, album_id: s.album_id })})'>Edit</button>
                 <button class="btn danger" style="padding:7px 14px;" onclick="deleteSong(${s.id}, '${esc(s.title)}')">Delete</button>
               </td>
-            </tr>`).join("")
+            </tr>`;
+          }).join("")
             : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">No songs yet — add your first one above!</td></tr>'}
         </tbody>
       </table>
     </div>
   `;
+
   $("#saveSongBtn").addEventListener("click", saveSong);
   $("#cancelEditBtn").addEventListener("click", resetForm);
 }
@@ -351,6 +351,7 @@ async function saveSong() {
   const title = $("#songTitle").value.trim();
   const artist = $("#songArtist").value.trim();
   const album = $("#songAlbum").value.trim();
+  const albumId = $("#songAlbumId").value || null;
   const mp3 = $("#songMp3").files[0];
   const image = $("#songImage").files[0];
 
@@ -362,13 +363,14 @@ async function saveSong() {
   btn.disabled = true;
   status.className = "status success";
   status.textContent = "Working...";
+
   try {
     let url = null, image_url = null;
     if (mp3) url = await uploadFile(mp3, "songs");
     if (image) image_url = await uploadFile(image, "images");
 
     if (editingSongId) {
-      const updates = { title, artist, album };
+      const updates = { title, artist, album, album_id: albumId };
       if (url) updates.url = url;
       if (image_url) updates.image_url = image_url;
       await api("/api/songs", { method: "PUT", headers: { "Content-Type": "application/json" },
@@ -378,7 +380,7 @@ async function saveSong() {
     } else {
       if (!url) throw new Error("MP3 file zaroori hai (naye song ke liye)!");
       await api("/api/songs", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, artist, album, url, image_url }) });
+        body: JSON.stringify({ title, artist, album, url, image_url, album_id: albumId }) });
       status.textContent = "Song added!";
       resetForm(); loadSongsSection();
     }
@@ -393,6 +395,7 @@ function resetForm() {
   editingSongId = null;
   $("#formTitle").textContent = "Add New Song";
   ["songTitle","songArtist","songAlbum","songMp3","songImage"].forEach((id) => ($("#" + id).value = ""));
+  $("#songAlbumId").value = "";
   $("#saveSongBtn").textContent = "Add Song";
   $("#cancelEditBtn").style.display = "none";
 }
@@ -403,6 +406,7 @@ function startEdit(song) {
   $("#songTitle").value = song.title;
   $("#songArtist").value = song.artist;
   $("#songAlbum").value = song.album || "";
+  $("#songAlbumId").value = song.album_id || "";
   $("#songMp3").value = ""; $("#songImage").value = "";
   $("#saveSongBtn").textContent = "Update Song";
   $("#cancelEditBtn").style.display = "inline-block";
@@ -420,11 +424,14 @@ async function deleteSong(id, title) {
 
 async function loadSongsSection() {
   content.innerHTML = skeletonPage();
-  const data = await api("/api/songs");
-  renderSongs(data.songs);
+  const [songsData, albumsData] = await Promise.all([
+    api("/api/songs"),
+    api("/api/albums")
+  ]);
+  renderSongs(songsData.songs, albumsData.albums);
 }
 
-// ================= ALBUMS =================
+// ================= ALBUMS (full CRUD) =================
 let editingAlbumId = null;
 
 async function loadAlbumsSection() {
@@ -594,7 +601,7 @@ async function loadSongsTrackingSection() {
     ${skeletonTable()}
   `;
   const data = await api("/api/tracking?range=7");
-  live.trackTotals = data.totals;   // 🆕 live store
+  live.trackTotals = data.totals;
 
   content.innerHTML = `
     <h2>Songs Tracking</h2>
@@ -618,7 +625,7 @@ async function loadSongsTrackingSection() {
   `;
 }
 
-// ================= USERS TRACKING (naam/email ke saath) =================
+// ================= USERS TRACKING =================
 async function loadUsersTrackingSection() {
   content.innerHTML = `
     <h2>Users Tracking</h2>
@@ -640,7 +647,6 @@ async function loadUsersTrackingSection() {
         <thead><tr><th>#</th><th>User</th><th>Listens</th><th>Last Active</th><th>Status</th></tr></thead>
         <tbody>
           ${data.userTracking.length ? data.userTracking.map((r, i) => {
-            // 🆕 Naam/email dikhao — na ho to UUID chhota karke
             let userDisplay;
             if (r.user_id === "anonymous") {
               userDisplay = '<span class="badge gray">Guest</span>';
@@ -673,7 +679,7 @@ async function loadPageViewsSection() {
     <div class="panel"><div class="skeleton skeleton-chart"></div></div>
   `;
   const data = await api("/api/pageviews");
-  live.pages = data.pages;   // 🆕 live store
+  live.pages = data.pages;
   const pages = data.pages;
   const maxViews = Math.max(...pages.map((p) => p.views), 1);
 
@@ -764,11 +770,21 @@ try {
   SUPA
     .channel("live-updates")
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "song_listens" }, () => {
-      liveUpdateOnListen();   // ⚡ sirf numbers patch — no re-render!
+      liveUpdateOnListen();
     })
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "page_views" }, (payload) => {
       const page = payload.new?.page_name || "unknown";
-      liveUpdateOnPageView(page);   // ⚡ sirf bar patch
+      liveUpdateOnPageView(page);
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "songs" }, () => {
+      if (currentSection === "songs") {
+        loadSongsSection();
+      }
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "albums" }, () => {
+      if (currentSection === "albums") {
+        loadAlbumsSection();
+      }
     })
     .subscribe();
 } catch (e) {
