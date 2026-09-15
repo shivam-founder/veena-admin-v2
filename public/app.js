@@ -1,7 +1,7 @@
 // ================= HELPERS =================
 const $ = (sel) => document.querySelector(sel);
 const content = $("#content");
-let currentSection = "dashboard";   // 🆕 realtime listener isko padhega
+let currentSection = "dashboard";
 
 function esc(str) {
   return (str || "").replace(/[&<>"']/g, (c) => ({
@@ -36,7 +36,7 @@ async function uploadFile(file, folder) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       fileName: file.name, fileType: file.type,
-      fileBase64: base64, folder: folder
+      fileBase64: base64, folder
     })
   });
   const data = await res.json();
@@ -44,7 +44,7 @@ async function uploadFile(file, folder) {
   return data.url;
 }
 
-// ================= 🆕 SKELETON TEMPLATES =================
+// ================= SKELETONS (sirf manual navigation pe) =================
 function skeletonDashboard() {
   return `
     <h2>Dashboard</h2>
@@ -67,28 +67,32 @@ function skeletonTable(rows = 5) {
 }
 
 function skeletonPage() {
-  return `
-    <h2>Loading...</h2>
-    <p class="page-sub">Please wait</p>
-    ${skeletonTable(6)}
-  `;
+  return `<h2>Loading...</h2><p class="page-sub">Please wait</p>${skeletonTable(6)}`;
 }
 
-// ================= DASHBOARD =================
-let charts = {};
+// ================= LIVE DATA STORE (surgical updates ke liye) =================
+const live = {
+  stats: { totalSongs: 0, totalUsers: 0, listensAll: 0, listens7d: 0 },
+  series7d: {},
+  pages: [],
+  charts: {}   // yahan charts hain — ab `charts` variable ki jagah
+};
 
+// ================= DASHBOARD =================
 function renderDashboard(data) {
-  const s = data.stats;
+  live.stats = data.stats;
+  live.series7d = data.series7d;
+  live.pages = data.pages;
 
   content.innerHTML = `
     <h2>Dashboard</h2>
-    <p class="page-sub">Overview of your music platform</p>
+    <p class="page-sub">Overview of your music platform <span class="badge green" id="liveBadge">● LIVE</span></p>
 
     <div class="stat-grid">
-      <div class="stat-card"><div class="label">Total Songs</div><div class="value">${s.totalSongs}</div></div>
-      <div class="stat-card"><div class="label">Total Users</div><div class="value">${s.totalUsers}</div></div>
-      <div class="stat-card"><div class="label">Total Listens</div><div class="value">${s.listensAll}</div></div>
-      <div class="stat-card"><div class="label">Listens (7 days)</div><div class="value">${s.listens7d}</div></div>
+      <div class="stat-card"><div class="label">Total Songs</div><div class="value" id="statSongs">${s.totalSongs}</div></div>
+      <div class="stat-card"><div class="label">Total Users</div><div class="value" id="statUsers">${s.totalUsers}</div></div>
+      <div class="stat-card"><div class="label">Total Listens</div><div class="value" id="statListens">${s.listensAll}</div></div>
+      <div class="stat-card"><div class="label">Listens (7 days)</div><div class="value" id="statListens7d">${s.listens7d}</div></div>
     </div>
 
     <div class="panel">
@@ -129,11 +133,11 @@ function renderDashboard(data) {
     </div>
   `;
 
-  Object.values(charts).forEach((c) => c.destroy());
-  charts = {};
+  Object.values(live.charts).forEach((c) => c.destroy());
+  live.charts = {};
   const days = Object.keys(data.series7d);
 
-  charts["7d"] = new Chart($("#chart7d"), {
+  live.charts["7d"] = new Chart($("#chart7d"), {
     type: "line",
     data: {
       labels: days.map((d) => d.slice(5)),
@@ -141,10 +145,10 @@ function renderDashboard(data) {
         label: "Listens", data: Object.values(data.series7d),
         borderColor: "#2E4B2A",
         backgroundColor: (ctx) => {
-          const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 240);
-          gradient.addColorStop(0, "rgba(46,75,42,0.25)");
-          gradient.addColorStop(1, "rgba(46,75,42,0.01)");
-          return gradient;
+          const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 240);
+          g.addColorStop(0, "rgba(46,75,42,0.25)");
+          g.addColorStop(1, "rgba(46,75,42,0.01)");
+          return g;
         },
         fill: true, tension: 0.35, pointRadius: 3,
         pointBackgroundColor: "#2E4B2A", pointBorderWidth: 0
@@ -163,7 +167,7 @@ function renderDashboard(data) {
     }
   });
 
-  charts["pages"] = new Chart($("#chartPages"), {
+  live.charts["pages"] = new Chart($("#chartPages"), {
     type: "bar",
     data: {
       labels: data.pages.map((p) => p.page_name),
@@ -186,6 +190,111 @@ function renderDashboard(data) {
   });
 }
 
+// ================= 🆕 SURGICAL LIVE UPDATES (no re-render!) =================
+
+// Listen aayi → sirf numbers + chart point update
+function liveUpdateOnListen() {
+  if (currentSection === "dashboard") {
+    live.stats.listensAll++;
+    live.stats.listens7d++;
+
+    // Stat values patch (sirf text change — no re-render!)
+    const elAll = $("#statListens");
+    const el7d = $("#statListens7d");
+    if (elAll) elAll.textContent = live.stats.listensAll;
+    if (el7d) el7d.textContent = live.stats.listens7d;
+
+    // Chart me aaj ka point +1
+    const today = new Date().toISOString().slice(0, 10);
+    if (live.series7d[today] !== undefined) {
+      live.series7d[today]++;
+      const chart = live.charts["7d"];
+      if (chart) {
+        const idx = chart.data.labels.indexOf(today.slice(5));
+        if (idx >= 0) {
+          chart.data.datasets[0].data[idx] = live.series7d[today];
+          chart.update("none");   // no animation flash
+        }
+      }
+    }
+  }
+
+  // Songs Tracking section me counter live increment
+  if (currentSection === "songstracking") {
+    const el = $("#trackTotalListens");
+    if (el) {
+      live.trackTotals = live.trackTotals || { totalListens: 0, activeUsers: 0 };
+      live.trackTotals.totalListens++;
+      el.textContent = live.trackTotals.totalListens;
+    }
+  }
+}
+
+// Page view aaya → sirf bar update
+function liveUpdateOnPageView(pageName) {
+  // Live store me increment
+  let found = false;
+  live.pages.forEach((p) => {
+    if (p.page_name === pageName) { p.views++; found = true; }
+  });
+  if (!found) live.pages.push({ page_name: pageName, views: 1, unique_users: 1 });
+
+  if (currentSection === "dashboard") {
+    const chart = live.charts["pages"];
+    if (chart) {
+      const idx = chart.data.labels.indexOf(pageName);
+      if (idx >= 0) {
+        chart.data.datasets[0].data[idx]++;
+        chart.update("none");
+      } else {
+        chart.data.labels.push(pageName);
+        chart.data.datasets[0].data.push(1);
+        chart.update("none");
+      }
+    }
+  }
+
+  if (currentSection === "pageviews") {
+    // Bar width/value patch — pure section re-render nahi
+    const rows = document.querySelectorAll(".bar-row");
+    for (const row of rows) {
+      const label = row.querySelector(".bar-label")?.textContent;
+      if (label === pageName) {
+        const valEl = row.querySelector(".bar-value");
+        const fillEl = row.querySelector(".bar-fill");
+        if (valEl && fillEl) {
+          const p = live.pages.find((x) => x.page_name === pageName);
+          valEl.textContent = p.views;
+          const maxViews = Math.max(...live.pages.map((x) => x.views), 1);
+          fillEl.style.width = Math.round((p.views / maxViews) * 100) + "%";
+        }
+        return;
+      }
+    }
+    // Naya page tha — nayi bar row append karo
+    const wrap = document.querySelector(".panel div");
+    if (wrap) {
+      const p = live.pages.find((x) => x.page_name === pageName);
+      const maxViews = Math.max(...live.pages.map((x) => x.views), 1);
+      const div = document.createElement("div");
+      div.className = "bar-row";
+      div.innerHTML = `
+        <div class="bar-label">${esc(pageName)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.views / maxViews) * 100)}%"></div></div>
+        <div class="bar-value">${p.views}</div>`;
+      wrap.appendChild(div);
+    }
+  }
+}
+
+// ================= DASHBOARD LOAD =================
+function loadDashboard() {
+  content.innerHTML = skeletonDashboard();
+  api("/api/stats").then(renderDashboard).catch((e) => {
+    content.innerHTML = `<p class="page-sub" style="color:var(--danger)">Error: ${esc(e.message)}</p>`;
+  });
+}
+
 // ================= SONGS =================
 let editingSongId = null;
 
@@ -193,7 +302,6 @@ function renderSongs(songs) {
   content.innerHTML = `
     <h2>Songs</h2>
     <p class="page-sub">${songs.length} songs in your library</p>
-
     <div class="panel">
       <h3 id="formTitle">Add New Song</h3>
       <input type="text" id="songTitle" placeholder="Song title" style="max-width:420px">
@@ -209,7 +317,6 @@ function renderSongs(songs) {
       </div>
       <div id="songStatus" class="status"></div>
     </div>
-
     <div class="panel">
       <h3>All Songs</h3>
       <table>
@@ -233,7 +340,6 @@ function renderSongs(songs) {
       </table>
     </div>
   `;
-
   $("#saveSongBtn").addEventListener("click", saveSong);
   $("#cancelEditBtn").addEventListener("click", resetForm);
 }
@@ -255,7 +361,6 @@ async function saveSong() {
   btn.disabled = true;
   status.className = "status success";
   status.textContent = "Working...";
-
   try {
     let url = null, image_url = null;
     if (mp3) url = await uploadFile(mp3, "songs");
@@ -488,19 +593,20 @@ async function loadSongsTrackingSection() {
     ${skeletonTable()}
   `;
   const data = await api("/api/tracking?range=7");
+  live.trackTotals = data.totals;   // 🆕 live store
 
   content.innerHTML = `
     <h2>Songs Tracking</h2>
     <p class="page-sub">Listening activity — last ${data.days} days</p>
     <div class="stat-grid">
-      <div class="stat-card"><div class="label">Total Listens (${data.days}d)</div><div class="value">${data.totals.totalListens}</div></div>
-      <div class="stat-card"><div class="label">Active Users (${data.days}d)</div><div class="value">${data.totals.activeUsers}</div></div>
+      <div class="stat-card"><div class="label">Total Listens (${data.days}d)</div><div class="value" id="trackTotalListens">${data.totals.totalListens}</div></div>
+      <div class="stat-card"><div class="label">Active Users (${data.days}d)</div><div class="value" id="trackActiveUsers">${data.totals.activeUsers}</div></div>
     </div>
     <div class="panel">
       <h3>Song Performance</h3>
       <table>
         <thead><tr><th>#</th><th>Song</th><th>Artist</th><th>Listens</th><th>Unique Listeners</th></tr></thead>
-        <tbody>
+        <tbody id="trackTableBody">
           ${data.songTracking.length ? data.songTracking.map((r, i) => `
             <tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td>${esc(r.artist)}</td>
             <td><span class="badge green">${r.listens}</span></td><td>${r.unique_listeners}</td></tr>`).join("")
@@ -553,6 +659,7 @@ async function loadPageViewsSection() {
     <div class="panel"><div class="skeleton skeleton-chart"></div></div>
   `;
   const data = await api("/api/pageviews");
+  live.pages = data.pages;   // 🆕 live store
   const pages = data.pages;
   const maxViews = Math.max(...pages.map((p) => p.views), 1);
 
@@ -602,18 +709,13 @@ async function loadUsersSection() {
 
 // ================= ROUTER =================
 function navigate(key) {
-  currentSection = key;   // 🆕 realtime listener isko padhta hai
+  currentSection = key;
   document.querySelectorAll("#nav a").forEach((a) => {
     a.classList.toggle("active", a.dataset.section === key);
   });
 
   const sections = {
-    dashboard: () => {
-      content.innerHTML = skeletonDashboard();
-      api("/api/stats").then(renderDashboard).catch((e) => {
-        content.innerHTML = `<p class="page-sub" style="color:var(--danger)">Error: ${esc(e.message)}</p>`;
-      });
-    },
+    dashboard: loadDashboard,
     songs: loadSongsSection,
     albums: loadAlbumsSection,
     notifications: loadNotificationsSection,
@@ -638,8 +740,7 @@ document.querySelectorAll("#nav a").forEach((a) => {
   window.location.href = "/";
 });
 
-// ================= 🆕 REALTIME (Supabase Live Updates) =================
-// Ye SABSE LAST me hai — navigate + sab kuch defined hone ke baad!
+// ================= REALTIME (surgical — no full refresh!) =================
 try {
   const SUPA = supabase.createClient(
     "https://thxoguhlrqrrnqwtyqkg.supabase.co",
@@ -649,24 +750,11 @@ try {
   SUPA
     .channel("live-updates")
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "song_listens" }, () => {
-      if (currentSection === "dashboard" || currentSection === "songstracking") {
-        navigate(currentSection);   // ⚡ live refresh!
-      }
+      liveUpdateOnListen();   // ⚡ sirf numbers patch — no re-render!
     })
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "page_views" }, () => {
-      if (currentSection === "pageviews" || currentSection === "dashboard") {
-        navigate(currentSection);
-      }
-    })
-    .on("postgres_changes", { event: "*", schema: "public", table: "songs" }, () => {
-      if (currentSection === "songs") {
-        navigate("songs");
-      }
-    })
-    .on("postgres_changes", { event: "*", schema: "public", table: "albums" }, () => {
-      if (currentSection === "albums") {
-        navigate("albums");
-      }
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "page_views" }, (payload) => {
+      const page = payload.new?.page_name || "unknown";
+      liveUpdateOnPageView(page);   // ⚡ sirf bar patch
     })
     .subscribe();
 } catch (e) {
