@@ -545,6 +545,8 @@ async function deleteAlbum(id, name) {
 }
 
 // ================= 🆕 ALBUM DETAIL (songs add/remove) =================
+let currentAlbumDetailId = null;
+
 async function openAlbumDetail(albumId) {
   currentAlbumDetailId = albumId;
   content.innerHTML = '<h2>Loading...</h2><p class="page-sub">Please wait</p>';
@@ -866,7 +868,7 @@ function navigate(key) {
   document.querySelectorAll("#nav a").forEach((a) => {
     a.classList.toggle("active", a.dataset.section === key);
   });
-  // 🆕 Mobile bottom nav sync
+  // Mobile bottom nav sync
   document.querySelectorAll("#bottomNav a").forEach((a) => {
     a.classList.toggle("active", a.dataset.section === key);
   });
@@ -892,11 +894,11 @@ document.querySelectorAll("#nav a").forEach((a) => {
   });
 });
 
-// 🆕 Mobile bottom nav events
+// Mobile bottom nav events
 document.querySelectorAll("#bottomNav a").forEach((a) => {
   a.addEventListener("click", (e) => {
     e.preventDefault();
-    if (a.id === "logoutBtnMobile") return;   // logout alag handle hoga
+    if (a.id === "logoutBtnMobile") return;
     navigate(a.dataset.section);
   });
 });
@@ -906,7 +908,7 @@ document.querySelectorAll("#bottomNav a").forEach((a) => {
   window.location.href = "/";
 });
 
-// 🆕 Mobile logout
+// Mobile logout
 const logoutMobile = $("#logoutBtnMobile");
 if (logoutMobile) {
   logoutMobile.addEventListener("click", async (e) => {
