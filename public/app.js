@@ -35,7 +35,7 @@ async function uploadFile(file, folder) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       fileName: file.name, fileType: file.type,
-      fileBase64: base64, folder: folder
+      fileBase64: base64, folder
     })
   });
   const data = await res.json();
@@ -43,37 +43,88 @@ async function uploadFile(file, folder) {
   return data.url;
 }
 
+// ================= 🆕 SKELETON TEMPLATES =================
+function skeletonDashboard() {
+  return `
+    <h2>Dashboard</h2>
+    <p class="page-sub">Loading...</p>
+    <div class="stat-grid">
+      <div class="stat-card skeleton skeleton-stat"></div>
+      <div class="stat-card skeleton skeleton-stat"></div>
+      <div class="stat-card skeleton skeleton-stat"></div>
+      <div class="stat-card skeleton skeleton-stat"></div>
+    </div>
+    <div class="panel"><div class="skeleton skeleton-chart"></div></div>
+    <div class="panel"><div class="skeleton skeleton-chart"></div></div>
+  `;
+}
+
+function skeletonTable(rows = 5) {
+  let html = '<div class="panel">';
+  for (let i = 0; i < rows; i++) html += '<div class="skeleton skeleton-row"></div>';
+  return html + "</div>";
+}
+
+function skeletonPage() {
+  return `
+    <h2>Loading...</h2>
+    <p class="page-sub">Please wait</p>
+    ${skeletonTable(6)}
+  `;
+}
+
 // ================= DASHBOARD =================
 let charts = {};
 
 function renderDashboard(data) {
   const s = data.stats;
+
   content.innerHTML = `
     <h2>Dashboard</h2>
     <p class="page-sub">Overview of your music platform</p>
+
     <div class="stat-grid">
       <div class="stat-card"><div class="label">Total Songs</div><div class="value">${s.totalSongs}</div></div>
       <div class="stat-card"><div class="label">Total Users</div><div class="value">${s.totalUsers}</div></div>
       <div class="stat-card"><div class="label">Total Listens</div><div class="value">${s.listensAll}</div></div>
       <div class="stat-card"><div class="label">Listens (7 days)</div><div class="value">${s.listens7d}</div></div>
     </div>
-    <div class="panel"><h3>Listens — Last 7 Days</h3><div class="chart-wrap"><canvas id="chart7d"></canvas></div></div>
-    <div class="panel"><h3>Page Views</h3><div class="chart-wrap"><canvas id="chartPages"></canvas></div></div>
+
+    <div class="panel">
+      <h3>Listens — Last 7 Days</h3>
+      <div class="chart-wrap"><canvas id="chart7d"></canvas></div>
+    </div>
+
+    <div class="panel">
+      <h3>Page Views</h3>
+      <div class="chart-wrap"><canvas id="chartPages"></canvas></div>
+    </div>
+
     <div class="panel">
       <h3>Top Played Songs</h3>
-      <table><thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Listens</th><th>Unique</th></tr></thead><tbody>
-      ${data.topPlayed.length ? data.topPlayed.map((r, i) => `
-        <tr><td>${i + 1}</td><td>${esc(r.title)}</td><td>${esc(r.artist)}</td><td><b>${r.listens}</b></td><td>${r.unique_listeners}</td></tr>`).join("")
-        : '<tr><td colspan="5" style="color:#888">No listens logged yet</td></tr>'}
-      </tbody></table>
+      <table>
+        <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Listens</th><th>Unique</th></tr></thead>
+        <tbody>
+          ${data.topPlayed.length
+            ? data.topPlayed.map((r, i) => `
+              <tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td>${esc(r.artist)}</td>
+              <td><span class="badge green">${r.listens}</span></td><td>${r.unique_listeners}</td></tr>`).join("")
+            : '<tr><td colspan="5" style="color:var(--text-3)">No listens logged yet</td></tr>'}
+        </tbody>
+      </table>
     </div>
+
     <div class="panel">
       <h3>Top Liked Songs</h3>
-      <table><thead><tr><th>#</th><th>Title</th><th>Likes</th></tr></thead><tbody>
-      ${data.topLiked.length ? data.topLiked.map((r, i) => `
-        <tr><td>${i + 1}</td><td>${esc(r.title)}</td><td><b>${r.likes}</b></td></tr>`).join("")
-        : '<tr><td colspan="3" style="color:#888">No likes yet</td></tr>'}
-      </tbody></table>
+      <table>
+        <thead><tr><th>#</th><th>Title</th><th>Likes</th></tr></thead>
+        <tbody>
+          ${data.topLiked.length
+            ? data.topLiked.map((r, i) => `
+              <tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td><span class="badge green">${r.likes}</span></td></tr>`).join("")
+            : '<tr><td colspan="3" style="color:var(--text-3)">No likes yet</td></tr>'}
+        </tbody>
+      </table>
     </div>
   `;
 
@@ -83,22 +134,54 @@ function renderDashboard(data) {
 
   charts["7d"] = new Chart($("#chart7d"), {
     type: "line",
-    data: { labels: days.map((d) => d.slice(5)),
-      datasets: [{ label: "Listens", data: Object.values(data.series7d),
-        borderColor: "#2E4B2A", backgroundColor: "rgba(46,75,42,0.08)",
-        fill: true, tension: 0.35, pointRadius: 3 }] },
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+    data: {
+      labels: days.map((d) => d.slice(5)),
+      datasets: [{
+        label: "Listens", data: Object.values(data.series7d),
+        borderColor: "#2E4B2A",
+        backgroundColor: (ctx) => {
+          const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 240);
+          gradient.addColorStop(0, "rgba(46,75,42,0.25)");
+          gradient.addColorStop(1, "rgba(46,75,42,0.01)");
+          return gradient;
+        },
+        fill: true, tension: 0.35, pointRadius: 3,
+        pointBackgroundColor: "#2E4B2A", pointBorderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: "#1A1A1A", padding: 10, cornerRadius: 8, displayColors: false }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#F4F4F6" } },
+        x: { grid: { display: false } }
+      }
+    }
   });
 
   charts["pages"] = new Chart($("#chartPages"), {
     type: "bar",
-    data: { labels: data.pages.map((p) => p.page_name),
-      datasets: [{ label: "Views", data: data.pages.map((p) => p.views), backgroundColor: "#2E4B2A", borderRadius: 5 }] },
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+    data: {
+      labels: data.pages.map((p) => p.page_name),
+      datasets: [{
+        label: "Views", data: data.pages.map((p) => p.views),
+        backgroundColor: "#2E4B2A", borderRadius: 6, maxBarThickness: 40
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: "#1A1A1A", padding: 10, cornerRadius: 8 }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#F4F4F6" } },
+        x: { grid: { display: false } }
+      }
+    }
   });
 }
 
@@ -109,38 +192,47 @@ function renderSongs(songs) {
   content.innerHTML = `
     <h2>Songs</h2>
     <p class="page-sub">${songs.length} songs in your library</p>
+
     <div class="panel">
       <h3 id="formTitle">Add New Song</h3>
-      <input type="text" id="songTitle" placeholder="Song title" style="max-width:400px">
-      <input type="text" id="songArtist" placeholder="Artist name" style="max-width:400px">
-      <input type="text" id="songAlbum" placeholder="Album name (optional)" style="max-width:400px">
-      <label style="font-size:12px; color:#888; display:block;">MP3 File</label>
-      <input type="file" id="songMp3" accept="audio/mpeg" style="max-width:400px">
-      <label style="font-size:12px; color:#888; display:block; margin-top:8px;">Cover Image (optional)</label>
-      <input type="file" id="songImage" accept="image/jpeg,image/png,image/webp" style="max-width:400px">
-      <div style="margin-top:14px; display:flex; gap:10px;">
+      <input type="text" id="songTitle" placeholder="Song title" style="max-width:420px">
+      <input type="text" id="songArtist" placeholder="Artist name" style="max-width:420px">
+      <input type="text" id="songAlbum" placeholder="Album name (optional)" style="max-width:420px">
+      <label style="font-size:12px; color:var(--text-3); display:block; margin-top:4px;">MP3 File</label>
+      <input type="file" id="songMp3" accept="audio/mpeg" style="max-width:420px">
+      <label style="font-size:12px; color:var(--text-3); display:block; margin-top:8px;">Cover Image (optional)</label>
+      <input type="file" id="songImage" accept="image/jpeg,image/png,image/webp" style="max-width:420px">
+      <div style="margin-top:16px; display:flex; gap:10px;">
         <button class="btn" id="saveSongBtn">Add Song</button>
-        <button class="btn secondary" id="cancelEditBtn" style="display:none;">Cancel Edit</button>
+        <button class="btn secondary" id="cancelEditBtn" style="display:none;">Cancel</button>
       </div>
       <div id="songStatus" class="status"></div>
     </div>
+
     <div class="panel">
       <h3>All Songs</h3>
-      <table><thead><tr><th>Cover</th><th>Title</th><th>Artist</th><th>Album</th><th>Actions</th></tr></thead><tbody>
-      ${songs.length ? songs.map((s) => `
-        <tr>
-          <td>${s.image_url ? `<img src="${esc(s.image_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">` : `<div style="width:36px;height:36px;border-radius:6px;background:#F0F0F0;"></div>`}</td>
-          <td><b>${esc(s.title)}</b></td>
-          <td>${esc(s.artist)}</td>
-          <td>${esc(s.album || "-")}</td>
-          <td>
-            <button class="btn secondary" style="padding:6px 12px;" onclick='startEdit(${JSON.stringify({ id: s.id, title: s.title, artist: s.artist, album: s.album })})'>Edit</button>
-            <button class="btn danger" style="padding:6px 12px;" onclick="deleteSong(${s.id}, '${esc(s.title)}')">Delete</button>
-          </td>
-        </tr>`).join("") : '<tr><td colspan="5" style="color:#888">No songs yet!</td></tr>'}
-      </tbody></table>
+      <table>
+        <thead><tr><th style="width:56px;">Cover</th><th>Title</th><th>Artist</th><th>Album</th><th style="width:180px;">Actions</th></tr></thead>
+        <tbody>
+          ${songs.length ? songs.map((s) => `
+            <tr>
+              <td>${s.image_url
+                ? `<img src="${esc(s.image_url)}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid var(--border);">`
+                : `<div style="width:40px;height:40px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">${esc(s.title[0]?.toUpperCase() || "?")}</div>`}</td>
+              <td><b>${esc(s.title)}</b></td>
+              <td>${esc(s.artist)}</td>
+              <td>${esc(s.album) || '<span style="color:var(--text-3)">—</span>'}</td>
+              <td>
+                <button class="btn secondary" style="padding:7px 14px;" onclick='startEdit(${JSON.stringify({ id: s.id, title: s.title, artist: s.artist, album: s.album })})'>Edit</button>
+                <button class="btn danger" style="padding:7px 14px;" onclick="deleteSong(${s.id}, '${esc(s.title)}')">Delete</button>
+              </td>
+            </tr>`).join("")
+            : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">No songs yet — add your first one above!</td></tr>'}
+        </tbody>
+      </table>
     </div>
   `;
+
   $("#saveSongBtn").addEventListener("click", saveSong);
   $("#cancelEditBtn").addEventListener("click", resetForm);
 }
@@ -220,7 +312,7 @@ async function deleteSong(id, title) {
 }
 
 async function loadSongsSection() {
-  content.innerHTML = '<h2>Songs</h2><p class="page-sub">Loading...</p>';
+  content.innerHTML = skeletonPage();   // 🆕 skeleton!
   const data = await api("/api/songs");
   renderSongs(data.songs);
 }
@@ -229,7 +321,7 @@ async function loadSongsSection() {
 let editingAlbumId = null;
 
 async function loadAlbumsSection() {
-  content.innerHTML = '<h2>Albums</h2><p class="page-sub">Loading...</p>';
+  content.innerHTML = skeletonPage();
   const data = await api("/api/albums");
   const albums = data.albums;
 
@@ -238,10 +330,10 @@ async function loadAlbumsSection() {
     <p class="page-sub">${albums.length} albums</p>
     <div class="panel">
       <h3 id="albumFormTitle">Add New Album</h3>
-      <input type="text" id="albumName" placeholder="Album name" style="max-width:400px">
-      <label style="font-size:12px; color:#888; display:block;">Cover Image (optional)</label>
-      <input type="file" id="albumCover" accept="image/jpeg,image/png,image/webp" style="max-width:400px">
-      <div style="margin-top:14px; display:flex; gap:10px;">
+      <input type="text" id="albumName" placeholder="Album name" style="max-width:420px">
+      <label style="font-size:12px; color:var(--text-3); display:block; margin-top:4px;">Cover Image (optional)</label>
+      <input type="file" id="albumCover" accept="image/jpeg,image/png,image/webp" style="max-width:420px">
+      <div style="margin-top:16px; display:flex; gap:10px;">
         <button class="btn" id="saveAlbumBtn">Add Album</button>
         <button class="btn secondary" id="cancelAlbumEdit" style="display:none;">Cancel</button>
       </div>
@@ -249,18 +341,20 @@ async function loadAlbumsSection() {
     </div>
     <div class="panel">
       <h3>All Albums</h3>
-      <table><thead><tr><th>Cover</th><th>Name</th><th>Songs</th><th>Actions</th></tr></thead><tbody>
-      ${albums.length ? albums.map((a) => `
-        <tr>
-          <td>${a.cover_url ? `<img src="${esc(a.cover_url)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;">` : `<div style="width:40px;height:40px;border-radius:6px;background:#F0F0F0;"></div>`}</td>
-          <td><b>${esc(a.name)}</b></td>
-          <td>${a.song_count}</td>
-          <td>
-            <button class="btn secondary" style="padding:6px 12px;" onclick='startAlbumEdit(${JSON.stringify({ id: a.id, name: a.name })})'>Edit</button>
-            <button class="btn danger" style="padding:6px 12px;" onclick="deleteAlbum(${a.id}, '${esc(a.name)}')">Delete</button>
-          </td>
-        </tr>`).join("") : '<tr><td colspan="4" style="color:#888">No albums yet!</td></tr>'}
-      </tbody></table>
+      <table>
+        <thead><tr><th style="width:60px;">Cover</th><th>Name</th><th>Songs</th><th style="width:180px;">Actions</th></tr></thead>
+        <tbody>
+        ${albums.length ? albums.map((a) => `
+          <tr>
+            <td>${a.cover_url ? `<img src="${esc(a.cover_url)}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--border);">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">${esc(a.name[0]?.toUpperCase() || "?")}</div>`}</td>
+            <td><b>${esc(a.name)}</b></td>
+            <td><span class="badge gray">${a.song_count} songs</span></td>
+            <td>
+              <button class="btn secondary" style="padding:7px 14px;" onclick='startAlbumEdit(${JSON.stringify({ id: a.id, name: a.name })})'>Edit</button>
+              <button class="btn danger" style="padding:7px 14px;" onclick="deleteAlbum(${a.id}, '${esc(a.name)}')">Delete</button>
+            </td>
+          </tr>`).join("") : '<tr><td colspan="4" style="color:var(--text-3); text-align:center; padding:30px;">No albums yet!</td></tr>'}
+        </tbody></table>
     </div>
   `;
   $("#saveAlbumBtn").addEventListener("click", saveAlbum);
@@ -281,11 +375,9 @@ async function saveAlbum() {
   btn.disabled = true;
   status.className = "status success";
   status.textContent = "Working...";
-
   try {
     let cover_url = null;
     if (cover) cover_url = await uploadFile(cover, "images");
-
     if (editingAlbumId) {
       await api("/api/albums", { method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: editingAlbumId, name, cover_url }) });
@@ -334,18 +426,19 @@ async function loadNotificationsSection() {
   content.innerHTML = `
     <h2>Notifications</h2>
     <p class="page-sub">Send push notifications to all users</p>
-    <div class="panel">
+    <div class="panel" style="max-width:560px;">
       <h3>Compose Notification</h3>
-      <input type="text" id="notifTitle" placeholder="Title (e.g. Naya gaana aa gaya!)" style="max-width:500px">
-      <textarea id="notifBody" placeholder="Message (e.g. Tere Liye ab Veena pe suno!)" rows="3" style="max-width:500px;"></textarea>
-      <button class="btn" id="sendNotifBtn" style="max-width:200px;">Send Notification</button>
+      <input type="text" id="notifTitle" placeholder="Title (e.g. Naya gaana aa gaya!)">
+      <textarea id="notifBody" placeholder="Message (e.g. Tere Liye ab Veena pe suno!)" rows="3"></textarea>
+      <button class="btn" id="sendNotifBtn">Send Notification</button>
       <div id="notifStatus" class="status"></div>
     </div>
     <div class="panel">
-      <h3>How it works</h3>
-      <p style="font-size:13px; color:#666; line-height:1.7;">
-        Notification sabhi registered devices par jayegi (Firebase Cloud Messaging).
-        Frequency tip: roz zyada mat bhejo — sirf important updates ke liye use karo.
+      <h3>Guidelines</h3>
+      <p style="font-size:13px; color:var(--text-2); line-height:1.8;">
+        Notification sabhi registered devices par jayegi (Firebase Cloud Messaging).<br>
+        Best practice: roz zyada mat bhejo — sirf important updates ke liye.<br>
+        Frequency: zyada notifications = users notifications off kar dete hain.
       </p>
     </div>
   `;
@@ -372,6 +465,7 @@ async function loadNotificationsSection() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Send failed");
+      status.className = "status success";
       status.textContent = `Sent to ${data.sent} devices! (${data.failed || 0} failed)`;
     } catch (e) {
       status.className = "status error";
@@ -381,20 +475,26 @@ async function loadNotificationsSection() {
   });
 }
 
-// ================= 🆕 SONGS TRACKING =================
+// ================= SONGS TRACKING =================
 async function loadSongsTrackingSection() {
-  content.innerHTML = '<h2>Songs Tracking</h2><p class="page-sub">Loading...</p>';
+  content.innerHTML = `
+    <h2>Songs Tracking</h2>
+    <p class="page-sub">Loading...</p>
+    <div class="stat-grid">
+      <div class="stat-card skeleton skeleton-stat"></div>
+      <div class="stat-card skeleton skeleton-stat"></div>
+    </div>
+    ${skeletonTable()}
+  `;
   const data = await api("/api/tracking?range=7");
 
   content.innerHTML = `
     <h2>Songs Tracking</h2>
     <p class="page-sub">Listening activity — last ${data.days} days</p>
-
     <div class="stat-grid">
       <div class="stat-card"><div class="label">Total Listens (${data.days}d)</div><div class="value">${data.totals.totalListens}</div></div>
       <div class="stat-card"><div class="label">Active Users (${data.days}d)</div><div class="value">${data.totals.activeUsers}</div></div>
     </div>
-
     <div class="panel">
       <h3>Song Performance</h3>
       <table>
@@ -402,28 +502,30 @@ async function loadSongsTrackingSection() {
         <tbody>
           ${data.songTracking.length ? data.songTracking.map((r, i) => `
             <tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td>${esc(r.artist)}</td>
-            <td><b>${r.listens}</b></td><td>${r.unique_listeners}</td></tr>`).join("")
-            : '<tr><td colspan="5" style="color:#888">Koi listen nahi hua abhi ${data.days} din me</td></tr>'}
+            <td><span class="badge green">${r.listens}</span></td><td>${r.unique_listeners}</td></tr>`).join("")
+            : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi listen nahi hua abhi — app me tracking hooks lagne ke baad data bharega</td></tr>'}
         </tbody>
       </table>
     </div>
   `;
 }
 
-// ================= 🆕 USERS TRACKING =================
+// ================= USERS TRACKING =================
 async function loadUsersTrackingSection() {
-  content.innerHTML = '<h2>Users Tracking</h2><p class="page-sub">Loading...</p>';
+  content.innerHTML = `
+    <h2>Users Tracking</h2>
+    <p class="page-sub">Loading...</p>
+    ${skeletonTable()}
+  `;
   const data = await api("/api/tracking?range=7");
 
   content.innerHTML = `
     <h2>Users Tracking</h2>
     <p class="page-sub">User activity — last ${data.days} days (privacy-safe: sirf counts)</p>
-
     <div class="stat-grid">
       <div class="stat-card"><div class="label">Active Users</div><div class="value">${data.totals.activeUsers}</div></div>
       <div class="stat-card"><div class="label">Total Listens</div><div class="value">${data.totals.totalListens}</div></div>
     </div>
-
     <div class="panel">
       <h3>Users by Activity</h3>
       <table>
@@ -431,28 +533,31 @@ async function loadUsersTrackingSection() {
         <tbody>
           ${data.userTracking.length ? data.userTracking.map((r, i) => `
             <tr><td>${i + 1}</td>
-            <td>${r.user_id === "anonymous" ? '<i style="color:#888">Guest user</i>' : `<code style="font-size:11px">${esc(r.user_id.slice(0, 12))}...</code>`}</td>
-            <td><b>${r.listens}</b></td>
-            <td>${r.last_active ? new Date(r.last_active).toLocaleString("en-IN") : "-"}</td>
-            <td>${r.status}</td></tr>`).join("")
-            : '<tr><td colspan="5" style="color:#888">Koi activity nahi abhi</td></tr>'}
+            <td>${r.user_id === "anonymous" ? '<span class="badge gray">Guest</span>' : `<code>${esc(r.user_id.slice(0, 12))}...</code>`}</td>
+            <td><span class="badge green">${r.listens}</span></td>
+            <td>${r.last_active ? new Date(r.last_active).toLocaleString("en-IN") : "—"}</td>
+            <td><span class="badge gray">${r.status}</span></td></tr>`).join("")
+            : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi activity nahi abhi</td></tr>'}
         </tbody>
       </table>
     </div>
   `;
 }
 
-// ================= 🆕 PAGE VIEWS =================
+// ================= PAGE VIEWS =================
 async function loadPageViewsSection() {
-  content.innerHTML = '<h2>Page Views</h2><p class="page-sub">Loading...</p>';
+  content.innerHTML = `
+    <h2>Page Views</h2>
+    <p class="page-sub">Loading...</p>
+    <div class="panel"><div class="skeleton skeleton-chart"></div></div>
+  `;
   const data = await api("/api/pageviews");
   const pages = data.pages;
   const maxViews = Math.max(...pages.map((p) => p.views), 1);
 
   content.innerHTML = `
     <h2>Page Views</h2>
-    <p class="page-sub">Kaunsi screen pe kitni baar gaye users (ads placement ke liye)</p>
-
+    <p class="page-sub">Kaunsi screen pe kitni baar gaye users — ads placement ka data</p>
     <div class="panel">
       <h3>Views by Page</h3>
       ${pages.length ? pages.map((p) => `
@@ -461,14 +566,14 @@ async function loadPageViewsSection() {
           <div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.views / maxViews) * 100)}%"></div></div>
           <div class="bar-value">${p.views}</div>
         </div>`).join("")
-        : '<p style="color:#888; text-align:center; padding:20px;">Koi page view logged nahi abhi. App side tracking aane ke baad yahan data bharega.</p>'}
+        : '<p style="color:var(--text-3); text-align:center; padding:30px;">Koi page view logged nahi abhi — app side tracking aane ke baad data bharega.</p>'}
     </div>
   `;
 }
 
 // ================= USERS =================
 async function loadUsersSection() {
-  content.innerHTML = '<h2>Users</h2><p class="page-sub">Loading...</p>';
+  content.innerHTML = skeletonPage();
   const data = await api("/api/users");
   const users = data.users;
 
@@ -479,18 +584,17 @@ async function loadUsersSection() {
       <table>
         <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Likes</th><th>Playlists</th><th>Joined</th></tr></thead>
         <tbody>
-          ${users.length ? users.map((u, i) => `
-            <tr>
-              <td>${i + 1}</td>
-              <td><b>${esc(u.name || "—")}</b></td>
-              <td>${esc(u.email || "—")}</td>
-              <td>${u.likes_count}</td>
-              <td>${u.playlists_count}</td>
-              <td>${new Date(u.created_at).toLocaleDateString("en-IN")}</td>
-            </tr>`).join("")
-            : '<tr><td colspan="6" style="color:#888">No users yet</td></tr>'}
-        </tbody>
-      </table>
+        ${users.length ? users.map((u, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td><b>${esc(u.name || "—")}</b></td>
+            <td>${esc(u.email || "—")}</td>
+            <td><span class="badge green">${u.likes_count}</span></td>
+            <td><span class="badge gray">${u.playlists_count}</span></td>
+            <td>${new Date(u.created_at).toLocaleDateString("en-IN")}</td>
+          </tr>`).join("")
+          : '<tr><td colspan="6" style="color:var(--text-3); text-align:center; padding:30px;">No users yet</td></tr>'}
+        </tbody></table>
     </div>
   `;
 }
@@ -503,9 +607,9 @@ function navigate(key) {
 
   const sections = {
     dashboard: () => {
-      content.innerHTML = '<p class="page-sub">Loading dashboard...</p>';
+      content.innerHTML = skeletonDashboard();
       api("/api/stats").then(renderDashboard).catch((e) => {
-        content.innerHTML = `<p class="page-sub" style="color:#C0392B">Error: ${esc(e.message)}</p>`;
+        content.innerHTML = `<p class="page-sub" style="color:var(--danger)">Error: ${esc(e.message)}</p>`;
       });
     },
     songs: loadSongsSection,
