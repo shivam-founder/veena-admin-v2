@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2E4B2A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Veena Admin">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
   <title>Veena Admin</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
@@ -11,6 +17,7 @@
 </head>
 <body>
   <div class="layout">
+    <!-- Desktop sidebar -->
     <aside class="sidebar">
       <div class="logo">Veena Admin</div>
       <nav id="nav">
@@ -25,10 +32,65 @@
       </nav>
       <button class="logout" id="logoutBtn">Logout</button>
     </aside>
+
+    <!-- Main content -->
     <main class="main">
       <div id="content"></div>
     </main>
+
+    <!-- 🆕 Mobile bottom nav -->
+    <div class="bottom-nav" id="bottomNav">
+      <div class="bn-scroll">
+        <a href="#" data-section="dashboard" class="active">Dashboard</a>
+        <a href="#" data-section="songs">Songs</a>
+        <a href="#" data-section="albums">Albums</a>
+        <a href="#" data-section="notifications">Notify</a>
+        <a href="#" data-section="users">Users</a>
+        <a href="#" data-section="songstracking">Tracking</a>
+        <a href="#" data-section="pageviews">Views</a>
+        <a href="#" id="logoutBtnMobile">Logout</a>
+      </div>
+    </div>
+
+    <!-- 🆕 PWA install banner -->
+    <div class="install-banner" id="installBanner">
+      <div class="ib-text">Install Veena Admin</div>
+      <div class="ib-sub">Home screen pe add karo — app jaisa experience</div>
+      <div class="ib-actions">
+        <button class="btn" id="installBtn">Install</button>
+        <button class="btn secondary" id="dismissInstallBtn">Later</button>
+      </div>
+    </div>
   </div>
+  <script>
+    // 🆕 Service worker register
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+
+    // 🆕 PWA install prompt
+    let deferredPrompt = null;
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      // Banner dikhaо (sirf mobile pe)
+      if (window.matchMedia("(max-width: 768px)").matches) {
+        document.getElementById("installBanner").classList.add("show");
+      }
+    });
+
+    document.getElementById("installBtn").addEventListener("click", async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        document.getElementById("installBanner").classList.remove("show");
+      }
+    });
+    document.getElementById("dismissInstallBtn").addEventListener("click", () => {
+      document.getElementById("installBanner").classList.remove("show");
+    });
+  </script>
   <script src="/app.js"></script>
 </body>
 </html>
