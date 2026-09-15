@@ -1,0 +1,24 @@
+{
+  "name": "Veena Admin",
+  "short_name": "Veena Admin",
+  "description": "Admin panel for Veena music platform",
+  "start_url": "/app.html",
+  "display": "standalone",
+  "background_color": "#F7F7F8",
+  "theme_color": "#2E4B2A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
