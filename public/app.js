@@ -1,6 +1,7 @@
 // ================= HELPERS =================
 const $ = (sel) => document.querySelector(sel);
 const content = $("#content");
+let currentSection = "dashboard";   // 🆕 realtime listener isko padhega
 
 function esc(str) {
   return (str || "").replace(/[&<>"']/g, (c) => ({
@@ -35,7 +36,7 @@ async function uploadFile(file, folder) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       fileName: file.name, fileType: file.type,
-      fileBase64: base64, folder
+      fileBase64: base64, folder: folder
     })
   });
   const data = await res.json();
@@ -312,7 +313,7 @@ async function deleteSong(id, title) {
 }
 
 async function loadSongsSection() {
-  content.innerHTML = skeletonPage();   // 🆕 skeleton!
+  content.innerHTML = skeletonPage();
   const data = await api("/api/songs");
   renderSongs(data.songs);
 }
@@ -503,7 +504,7 @@ async function loadSongsTrackingSection() {
           ${data.songTracking.length ? data.songTracking.map((r, i) => `
             <tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td>${esc(r.artist)}</td>
             <td><span class="badge green">${r.listens}</span></td><td>${r.unique_listeners}</td></tr>`).join("")
-            : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi listen nahi hua abhi — app me tracking hooks lagne ke baad data bharega</td></tr>'}
+            : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi listen nahi hua abhi</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -566,7 +567,7 @@ async function loadPageViewsSection() {
           <div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.views / maxViews) * 100)}%"></div></div>
           <div class="bar-value">${p.views}</div>
         </div>`).join("")
-        : '<p style="color:var(--text-3); text-align:center; padding:30px;">Koi page view logged nahi abhi — app side tracking aane ke baad data bharega.</p>'}
+        : '<p style="color:var(--text-3); text-align:center; padding:30px;">Koi page view logged nahi abhi.</p>'}
     </div>
   `;
 }
@@ -601,12 +602,7 @@ async function loadUsersSection() {
 
 // ================= ROUTER =================
 function navigate(key) {
-  document.querySelectorAll("#nav a").forEach((a) => {
-    a.classList.toggle("active", a.dataset.section === key);
-  });
-
-  function navigate(key) {
-  window.currentSection = key;   // 🆕 realtime listener isko padhta hai
+  currentSection = key;   // 🆕 realtime listener isko padhta hai
   document.querySelectorAll("#nav a").forEach((a) => {
     a.classList.toggle("active", a.dataset.section === key);
   });
@@ -642,4 +638,40 @@ document.querySelectorAll("#nav a").forEach((a) => {
   window.location.href = "/";
 });
 
+// ================= 🆕 REALTIME (Supabase Live Updates) =================
+// Ye SABSE LAST me hai — navigate + sab kuch defined hone ke baad!
+try {
+  const SUPA = supabase.createClient(
+    "https://thxoguhlrqrrnqwtyqkg.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoeG9ndWhscnFycm5xd3R5cWtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyODk3NTgsImV4cCI6MjEwNDg2NTc1OH0.hjemZBIjFU-5TKVfa8uuOA3rhvHfLnQilIaPMisvm4A"
+  );
+
+  SUPA
+    .channel("live-updates")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "song_listens" }, () => {
+      if (currentSection === "dashboard" || currentSection === "songstracking") {
+        navigate(currentSection);   // ⚡ live refresh!
+      }
+    })
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "page_views" }, () => {
+      if (currentSection === "pageviews" || currentSection === "dashboard") {
+        navigate(currentSection);
+      }
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "songs" }, () => {
+      if (currentSection === "songs") {
+        navigate("songs");
+      }
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "albums" }, () => {
+      if (currentSection === "albums") {
+        navigate("albums");
+      }
+    })
+    .subscribe();
+} catch (e) {
+  console.warn("Realtime init failed (non-fatal):", e);
+}
+
+// ---- Init ----
 navigate("dashboard");
