@@ -80,6 +80,7 @@ const live = {
 
 // ================= DASHBOARD =================
 function renderDashboard(data) {
+  const s = data.stats;
   live.stats = data.stats;
   live.series7d = data.series7d;
   live.pages = data.pages;
