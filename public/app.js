@@ -356,10 +356,16 @@ async function saveSong() {
   const status = $("#songStatus");
   const title = $("#songTitle").value.trim();
   const artist = $("#songArtist").value.trim();
-  const album = $("#songAlbum").value.trim();
   const albumId = $("#songAlbumId").value || null;
   const mp3 = $("#songMp3").files[0];
   const image = $("#songImage").files[0];
+
+  // 🆕 Album ka TEXT ab dropdown ke selected option se aayega
+  // (purana #songAlbum text input nahi hai ab!)
+  const albumSelect = $("#songAlbumId");
+  const album = (albumSelect && albumSelect.selectedIndex > 0)
+    ? albumSelect.options[albumSelect.selectedIndex].text
+    : "";
 
   if (!title || !artist) {
     status.className = "status error";
