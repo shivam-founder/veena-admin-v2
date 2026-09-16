@@ -44,6 +44,16 @@ async function uploadFile(file, folder) {
   return data.url;
 }
 
+// Filename se clean title banao: "tere_liye.mp3" → "Tere Liye"
+function titleFromFilename(name) {
+  return name
+    .replace(/\.[^.]+$/, "")        // extension hatao
+    .replace(/[_-]+/g, " ")         // underscore/dash → space
+    .replace(/\s+/g, " ")           // extra spaces hatao
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());  // Title Case
+}
+
 // ================= SKELETONS =================
 function skeletonDashboard() {
   return `
@@ -268,18 +278,6 @@ function liveUpdateOnPageView(pageName) {
         return;
       }
     }
-    const wrap = document.querySelector(".panel div");
-    if (wrap) {
-      const p = live.pages.find((x) => x.page_name === pageName);
-      const maxViews = Math.max(...live.pages.map((x) => x.views), 1);
-      const div = document.createElement("div");
-      div.className = "bar-row";
-      div.innerHTML = `
-        <div class="bar-label">${esc(pageName)}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.views / maxViews) * 100)}%"></div></div>
-        <div class="bar-value">${p.views}</div>`;
-      wrap.appendChild(div);
-    }
   }
 }
 
@@ -291,7 +289,7 @@ function loadDashboard() {
   });
 }
 
-// ================= SONGS (full CRUD + album dropdown) =================
+// ================= SONGS (full CRUD + album) =================
 let editingSongId = null;
 
 function renderSongs(songs, albums) {
@@ -300,22 +298,29 @@ function renderSongs(songs, albums) {
     <p class="page-sub">${songs.length} songs in your library</p>
 
     <div class="panel">
-      <h3 id="formTitle">Add New Song</h3>
-      <input type="text" id="songTitle" placeholder="Song title" style="max-width:420px">
-      <input type="text" id="songArtist" placeholder="Artist name" style="max-width:420px">
-      <select id="songAlbumId" style="max-width:420px;">
-        <option value="">— No album —</option>
-        ${albums.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("")}
-      </select>
-      <label style="font-size:12px; color:var(--text-3); display:block; margin-top:4px;">MP3 File</label>
-      <input type="file" id="songMp3" accept="audio/mpeg" style="max-width:420px">
-      <label style="font-size:12px; color:var(--text-3); display:block; margin-top:8px;">Cover Image (optional)</label>
-      <input type="file" id="songImage" accept="image/jpeg,image/png,image/webp" style="max-width:420px">
-      <div style="margin-top:16px; display:flex; gap:10px;">
-        <button class="btn" id="saveSongBtn">Add Song</button>
-        <button class="btn secondary" id="cancelEditBtn" style="display:none;">Cancel</button>
+      <h3>Add Songs</h3>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn secondary" id="singleAddBtn" style="flex:1; min-width:180px;">+ Single Song (with details)</button>
+        <button class="btn" id="bulkAddBtn" style="flex:1; min-width:180px;">⚡ Bulk Add (up to 50)</button>
       </div>
-      <div id="songStatus" class="status"></div>
+      <div id="singleFormWrap" style="display:none; margin-top:18px;">
+        <h3 id="formTitle" style="font-size:14px;">Add New Song</h3>
+        <input type="text" id="songTitle" placeholder="Song title" style="max-width:420px">
+        <input type="text" id="songArtist" placeholder="Artist name" style="max-width:420px">
+        <select id="songAlbumId" style="max-width:420px;">
+          <option value="">— No album —</option>
+          ${albums.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("")}
+        </select>
+        <label style="font-size:12px; color:var(--text-3); display:block; margin-top:4px;">MP3 File</label>
+        <input type="file" id="songMp3" accept="audio/mpeg" style="max-width:420px">
+        <label style="font-size:12px; color:var(--text-3); display:block; margin-top:8px;">Cover Image (optional)</label>
+        <input type="file" id="songImage" accept="image/jpeg,image/png,image/webp" style="max-width:420px">
+        <div style="margin-top:16px; display:flex; gap:10px;">
+          <button class="btn" id="saveSongBtn">Add Song</button>
+          <button class="btn secondary" id="cancelEditBtn" style="display:none;">Cancel</button>
+        </div>
+        <div id="songStatus" class="status"></div>
+      </div>
     </div>
 
     <div class="panel">
@@ -340,13 +345,18 @@ function renderSongs(songs, albums) {
               </td>
             </tr>`;
           }).join("")
-            : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">No songs yet — add your first one above!</td></tr>'}
+            : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">No songs yet!</td></tr>'}
         </tbody>
       </table>
       </div>
     </div>
   `;
 
+  $("#singleAddBtn").addEventListener("click", () => {
+    const w = $("#singleFormWrap");
+    w.style.display = w.style.display === "none" ? "block" : "none";
+  });
+  $("#bulkAddBtn").addEventListener("click", loadBulkSection);
   $("#saveSongBtn").addEventListener("click", saveSong);
   $("#cancelEditBtn").addEventListener("click", resetForm);
 }
@@ -356,16 +366,10 @@ async function saveSong() {
   const status = $("#songStatus");
   const title = $("#songTitle").value.trim();
   const artist = $("#songArtist").value.trim();
+  const album = $("#songAlbum").value.trim();
   const albumId = $("#songAlbumId").value || null;
   const mp3 = $("#songMp3").files[0];
   const image = $("#songImage").files[0];
-
-  // 🆕 Album ka TEXT ab dropdown ke selected option se aayega
-  // (purana #songAlbum text input nahi hai ab!)
-  const albumSelect = $("#songAlbumId");
-  const album = (albumSelect && albumSelect.selectedIndex > 0)
-    ? albumSelect.options[albumSelect.selectedIndex].text
-    : "";
 
   if (!title || !artist) {
     status.className = "status error";
@@ -413,6 +417,7 @@ function resetForm() {
 }
 
 function startEdit(song) {
+  $("#singleFormWrap").style.display = "block";
   editingSongId = song.id;
   $("#formTitle").textContent = "Edit Song: " + song.title;
   $("#songTitle").value = song.title;
@@ -443,8 +448,173 @@ async function loadSongsSection() {
   renderSongs(songsData.songs, albumsData.albums);
 }
 
-// ================= ALBUMS (full CRUD) =================
+// ================= 🆕 BULK ADD (50 songs ek saath!) =================
+let bulkItems = [];   // { mp3, image, status, error }
+
+async function loadBulkSection() {
+  const albumsData = await api("/api/albums");
+
+  content.innerHTML = `
+    <h2>Bulk Add Songs</h2>
+    <p class="page-sub">Ek saath 50 tak songs — images filename se auto-match hongi</p>
+
+    <div class="panel">
+      <h3>1. Files Choose Karo</h3>
+      <label style="font-size:12px; color:var(--text-3); display:block;">🎵 MP3 Files (multiple select — max 50)</label>
+      <input type="file" id="bulkMp3" accept="audio/mpeg" multiple style="max-width:100%;">
+      <label style="font-size:12px; color:var(--text-3); display:block; margin-top:10px;">🖼️ Cover Images (optional — filename se match hongi, jaise tere_liye.mp3 + tere_liye.jpg)</label>
+      <input type="file" id="bulkImages" accept="image/jpeg,image/png,image/webp" multiple style="max-width:100%;">
+    </div>
+
+    <div class="panel" id="bulkDetails" style="display:none;">
+      <h3>2. Details (sab songs pe apply honge)</h3>
+      <input type="text" id="bulkArtist" placeholder="Artist name (optional — khali chhod to filename se)" style="max-width:420px">
+      <select id="bulkAlbumId" style="max-width:420px;">
+        <option value="">— No album —</option>
+        ${albumsData.albums.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("")}
+      </select>
+      <button class="btn" id="bulkStartBtn" style="max-width:260px;">🚀 Start Upload</button>
+      <div id="bulkStatus" class="status"></div>
+    </div>
+
+    <div class="panel" id="bulkPreview" style="display:none;">
+      <h3>3. Preview</h3>
+      <div id="bulkPreviewList"></div>
+    </div>
+
+    <button class="btn secondary" onclick="loadSongsSection()">← Back to Songs</button>
+  `;
+
+  $("#bulkMp3").addEventListener("change", buildBulkPreview);
+  $("#bulkImages").addEventListener("change", buildBulkPreview);
+  $("#bulkStartBtn").addEventListener("click", processBulk);
+}
+
+function buildBulkPreview() {
+  const mp3s = Array.from($("#bulkMp3").files || []);
+  const images = Array.from($("#bulkImages").files || []);
+  const previewList = $("#bulkPreviewList");
+
+  if (mp3s.length === 0) {
+    $("#bulkDetails").style.display = "none";
+    $("#bulkPreview").style.display = "none";
+    return;
+  }
+
+  if (mp3s.length > 50) {
+    $("#bulkDetails").style.display = "none";
+    $("#bulkPreview").style.display = "block";
+    previewList.innerHTML = '<p style="color:var(--danger)">❌ Max 50 songs ek batch me! Kam files select karo.</p>';
+    return;
+  }
+
+  // Images ko base-name se map karo
+  const imgMap = {};
+  images.forEach((img) => {
+    const base = img.name.replace(/\.[^.]+$/, "").toLowerCase();
+    imgMap[base] = img;
+  });
+
+  bulkItems = mp3s.map((mp3) => {
+    const base = mp3.name.replace(/\.[^.]+$/, "").toLowerCase();
+    return {
+      mp3,
+      image: imgMap[base] || null,
+      title: titleFromFilename(mp3.name),
+      status: "pending"
+    };
+  });
+
+  $("#bulkDetails").style.display = "block";
+  $("#bulkPreview").style.display = "block";
+  previewList.innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>File</th><th>Title (auto)</th><th>Image</th><th>Status</th></tr></thead>
+      <tbody>
+        ${bulkItems.map((item, i) => `
+          <tr id="bulkRow${i}">
+            <td>${i + 1}</td>
+            <td><b>${esc(item.mp3.name)}</b></td>
+            <td>${esc(item.title)}</td>
+            <td>${item.image ? '✅ matched' : '<span style="color:var(--text-3)">—</span>'}</td>
+            <td class="bulk-status"><span class="badge gray">Pending</span></td>
+          </tr>`).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+async function processBulk() {
+  const startBtn = $("#bulkStartBtn");
+  const status = $("#bulkStatus");
+  startBtn.disabled = true;
+  status.className = "status success";
+  status.textContent = "Uploading... band mat karna!";
+
+  let success = 0, failed = 0;
+  const artist = $("#bulkArtist").value.trim();
+  const albumId = $("#bulkAlbumId").value || null;
+
+  // Sequential — ek-ek karke (Vercel safe)
+  for (let i = 0; i < bulkItems.length; i++) {
+    const item = bulkItems[i];
+    const row = $(`#bulkRow${i} .bulk-status`);
+    if (row) row.innerHTML = '<span class="badge gray">⏳ Uploading...</span>';
+
+    try {
+      // 1) MP3 upload
+      const url = await uploadFile(item.mp3, "songs");
+
+      // 2) Image upload (agar matched)
+      let image_url = null;
+      if (item.image) {
+        try {
+          image_url = await uploadFile(item.image, "images");
+        } catch (e) {
+          // image fail ho to bhi song add karo — bina image
+        }
+      }
+
+      // 3) Song save
+      await api("/api/songs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: item.title,
+          artist: artist || "Unknown Artist",
+          album: "",
+          url,
+          image_url,
+          album_id: albumId
+        })
+      });
+
+      success++;
+      item.status = "done";
+      if (row) row.innerHTML = '<span class="badge green">✅ Done</span>';
+    } catch (e) {
+      failed++;
+      item.status = "failed";
+      if (row) row.innerHTML = `<span class="badge red">❌ ${esc(e.message)}</span>`;
+    }
+
+    // Progress header update
+    status.textContent = `Progress: ${i + 1}/${bulkItems.length} (✅ ${success} | ❌ ${failed})`;
+
+    // Thoda gap — serverless friendly
+    await new Promise((r) => setTimeout(r, 300));
+  }
+
+  status.className = failed === 0 ? "status success" : "status error";
+  status.textContent = `🎉 DONE! ${success} songs add hue, ${failed} fail hue. App restart me sab dikhengi!`;
+
+  startBtn.disabled = false;
+  startBtn.textContent = "Upload More (refresh list first)";
+}
+
+// ================= ALBUMS =================
 let editingAlbumId = null;
+let currentAlbumDetailId = null;
 
 async function loadAlbumsSection() {
   content.innerHTML = skeletonPage();
@@ -550,7 +720,7 @@ async function deleteAlbum(id, name) {
   } catch (e) { alert("Delete failed: " + e.message); }
 }
 
-// ================= 🆕 ALBUM DETAIL (songs add/remove) =================
+// ================= ALBUM DETAIL =================
 let currentAlbumDetailId = null;
 
 async function openAlbumDetail(albumId) {
@@ -870,11 +1040,9 @@ async function loadUsersSection() {
 // ================= ROUTER =================
 function navigate(key) {
   currentSection = key;
-  // Desktop sidebar sync
   document.querySelectorAll("#nav a").forEach((a) => {
     a.classList.toggle("active", a.dataset.section === key);
   });
-  // Mobile bottom nav sync
   document.querySelectorAll("#bottomNav a").forEach((a) => {
     a.classList.toggle("active", a.dataset.section === key);
   });
@@ -900,7 +1068,6 @@ document.querySelectorAll("#nav a").forEach((a) => {
   });
 });
 
-// Mobile bottom nav events
 document.querySelectorAll("#bottomNav a").forEach((a) => {
   a.addEventListener("click", (e) => {
     e.preventDefault();
@@ -914,7 +1081,6 @@ document.querySelectorAll("#bottomNav a").forEach((a) => {
   window.location.href = "/";
 });
 
-// Mobile logout
 const logoutMobile = $("#logoutBtnMobile");
 if (logoutMobile) {
   logoutMobile.addEventListener("click", async (e) => {
@@ -924,7 +1090,7 @@ if (logoutMobile) {
   });
 }
 
-// ================= REALTIME (surgical — no full refresh!) =================
+// ================= REALTIME =================
 try {
   const SUPA = supabase.createClient(
     "https://thxoguhlrqrrnqwtyqkg.supabase.co",
