@@ -632,7 +632,6 @@ async function processBulk() {
 
 // ================= ALBUMS =================
 let editingAlbumId = null;
-let currentAlbumDetailId = null;
 
 async function loadAlbumsSection() {
   content.innerHTML = skeletonPage();
