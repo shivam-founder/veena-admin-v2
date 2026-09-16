@@ -44,14 +44,13 @@ async function uploadFile(file, folder) {
   return data.url;
 }
 
-// Filename se clean title banao: "tere_liye.mp3" → "Tere Liye"
 function titleFromFilename(name) {
   return name
-    .replace(/\.[^.]+$/, "")        // extension hatao
-    .replace(/[_-]+/g, " ")         // underscore/dash → space
-    .replace(/\s+/g, " ")           // extra spaces hatao
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
     .trim()
-    .replace(/\b\w/g, (c) => c.toUpperCase());  // Title Case
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // ================= SKELETONS =================
@@ -96,6 +95,19 @@ function renderDashboard(data) {
   live.series7d = data.series7d;
   live.pages = data.pages;
 
+  let topPlayedRows = "";
+  for (let i = 0; i < data.topPlayed.length; i++) {
+    const r = data.topPlayed[i];
+    topPlayedRows += `<tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td>${esc(r.artist)}</td>
+      <td><span class="badge green">${r.listens}</span></td><td>${r.unique_listeners}</td></tr>`;
+  }
+
+  let topLikedRows = "";
+  for (let i = 0; i < data.topLiked.length; i++) {
+    const r = data.topLiked[i];
+    topLikedRows += `<tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td><span class="badge green">${r.likes}</span></td></tr>`;
+  }
+
   content.innerHTML = `
     <h2>Dashboard</h2>
     <p class="page-sub">Overview of your music platform <span class="badge green">● LIVE</span></p>
@@ -122,13 +134,7 @@ function renderDashboard(data) {
       <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>Title</th><th>Artist</th><th>Listens</th><th>Unique</th></tr></thead>
-        <tbody>
-          ${data.topPlayed.length
-            ? data.topPlayed.map((r, i) => `
-              <tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td>${esc(r.artist)}</td>
-              <td><span class="badge green">${r.listens}</span></td><td>${r.unique_listeners}</td></tr>`).join("")
-            : '<tr><td colspan="5" style="color:var(--text-3)">No listens logged yet</td></tr>'}
-        </tbody>
+        <tbody>${topPlayedRows || '<tr><td colspan="5" style="color:var(--text-3)">No listens logged yet</td></tr>'}</tbody>
       </table>
       </div>
     </div>
@@ -138,12 +144,7 @@ function renderDashboard(data) {
       <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>Title</th><th>Likes</th></tr></thead>
-        <tbody>
-          ${data.topLiked.length
-            ? data.topLiked.map((r, i) => `
-              <tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td><span class="badge green">${r.likes}</span></td></tr>`).join("")
-            : '<tr><td colspan="3" style="color:var(--text-3)">No likes yet</td></tr>'}
-        </tbody>
+        <tbody>${topLikedRows || '<tr><td colspan="3" style="color:var(--text-3)">No likes yet</td></tr>'}</tbody>
       </table>
       </div>
     </div>
@@ -278,6 +279,18 @@ function liveUpdateOnPageView(pageName) {
         return;
       }
     }
+    const wrap = document.querySelector(".panel div");
+    if (wrap) {
+      const p = live.pages.find((x) => x.page_name === pageName);
+      const maxViews = Math.max(...live.pages.map((x) => x.views), 1);
+      const div = document.createElement("div");
+      div.className = "bar-row";
+      div.innerHTML = `
+        <div class="bar-label">${esc(pageName)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.views / maxViews) * 100)}%"></div></div>
+        <div class="bar-value">${p.views}</div>`;
+      wrap.appendChild(div);
+    }
   }
 }
 
@@ -289,10 +302,36 @@ function loadDashboard() {
   });
 }
 
-// ================= SONGS (full CRUD + album) =================
+// ================= SONGS =================
 let editingSongId = null;
 
 function renderSongs(songs, albums) {
+  let tableRows = "";
+  for (let i = 0; i < songs.length; i++) {
+    const s = songs[i];
+    const albumName = albums.find((a) => a.id === s.album_id)?.name || s.album || "—";
+    const coverHtml = s.image_url
+      ? `<img src="${esc(s.image_url)}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid var(--border);">`
+      : `<div style="width:40px;height:40px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">${esc(s.title[0]?.toUpperCase() || "?")}</div>`;
+    const editData = JSON.stringify({ id: s.id, title: s.title, artist: s.artist, album: s.album, album_id: s.album_id }).replace(/'/g, "&#39;");
+    tableRows += `
+      <tr>
+        <td>${coverHtml}</td>
+        <td><b>${esc(s.title)}</b></td>
+        <td>${esc(s.artist)}</td>
+        <td>${esc(albumName)}</td>
+        <td>
+          <button class="btn secondary" style="padding:7px 14px;" onclick='startEdit(${editData})'>Edit</button>
+          <button class="btn danger" style="padding:7px 14px;" onclick="deleteSong(${s.id}, '${esc(s.title)}')">Delete</button>
+        </td>
+      </tr>`;
+  }
+
+  let albumOptions = '<option value="">— No album —</option>';
+  for (let i = 0; i < albums.length; i++) {
+    albumOptions += `<option value="${albums[i].id}">${esc(albums[i].name)}</option>`;
+  }
+
   content.innerHTML = `
     <h2>Songs</h2>
     <p class="page-sub">${songs.length} songs in your library</p>
@@ -301,15 +340,14 @@ function renderSongs(songs, albums) {
       <h3>Add Songs</h3>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn secondary" id="singleAddBtn" style="flex:1; min-width:180px;">+ Single Song (with details)</button>
-        <button class="btn" id="bulkAddBtn" style="flex:1; min-width:180px;">⚡ Bulk Add (up to 50)</button>
+        <button class="btn" id="bulkAddBtn" style="flex:1; min-width:180px;">Bulk Add (up to 50)</button>
       </div>
       <div id="singleFormWrap" style="display:none; margin-top:18px;">
         <h3 id="formTitle" style="font-size:14px;">Add New Song</h3>
         <input type="text" id="songTitle" placeholder="Song title" style="max-width:420px">
         <input type="text" id="songArtist" placeholder="Artist name" style="max-width:420px">
         <select id="songAlbumId" style="max-width:420px;">
-          <option value="">— No album —</option>
-          ${albums.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("")}
+          ${albumOptions}
         </select>
         <label style="font-size:12px; color:var(--text-3); display:block; margin-top:4px;">MP3 File</label>
         <input type="file" id="songMp3" accept="audio/mpeg" style="max-width:420px">
@@ -328,25 +366,7 @@ function renderSongs(songs, albums) {
       <div class="table-wrap">
       <table>
         <thead><tr><th style="width:56px;">Cover</th><th>Title</th><th>Artist</th><th>Album</th><th style="width:180px;">Actions</th></tr></thead>
-        <tbody>
-          ${songs.length ? songs.map((s) => {
-            const albumName = albums.find((a) => a.id === s.album_id)?.name || s.album || "—";
-            return `
-            <tr>
-              <td>${s.image_url
-                ? `<img src="${esc(s.image_url)}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;border:1px solid var(--border);">`
-                : `<div style="width:40px;height:40px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">${esc(s.title[0]?.toUpperCase() || "?")}</div>`}</td>
-              <td><b>${esc(s.title)}</b></td>
-              <td>${esc(s.artist)}</td>
-              <td>${esc(albumName)}</td>
-              <td>
-                <button class="btn secondary" style="padding:7px 14px;" onclick='startEdit(${JSON.stringify({ id: s.id, title: s.title, artist: s.artist, album: s.album, album_id: s.album_id })})'>Edit</button>
-                <button class="btn danger" style="padding:7px 14px;" onclick="deleteSong(${s.id}, '${esc(s.title)}')">Delete</button>
-              </td>
-            </tr>`;
-          }).join("")
-            : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">No songs yet!</td></tr>'}
-        </tbody>
+        <tbody>${tableRows || '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">No songs yet!</td></tr>'}</tbody>
       </table>
       </div>
     </div>
@@ -366,7 +386,7 @@ async function saveSong() {
   const status = $("#songStatus");
   const title = $("#songTitle").value.trim();
   const artist = $("#songArtist").value.trim();
-  const album = $("#songAlbum").value.trim();
+  const album = $("#songAlbumId").selectedOptions[0]?.text || "";
   const albumId = $("#songAlbumId").value || null;
   const mp3 = $("#songMp3").files[0];
   const image = $("#songImage").files[0];
@@ -410,7 +430,7 @@ async function saveSong() {
 function resetForm() {
   editingSongId = null;
   $("#formTitle").textContent = "Add New Song";
-  ["songTitle","songArtist","songAlbum","songMp3","songImage"].forEach((id) => ($("#" + id).value = ""));
+  ["songTitle","songArtist","songMp3","songImage"].forEach((id) => ($("#" + id).value = ""));
   $("#songAlbumId").value = "";
   $("#saveSongBtn").textContent = "Add Song";
   $("#cancelEditBtn").style.display = "none";
@@ -422,7 +442,6 @@ function startEdit(song) {
   $("#formTitle").textContent = "Edit Song: " + song.title;
   $("#songTitle").value = song.title;
   $("#songArtist").value = song.artist;
-  $("#songAlbum").value = song.album || "";
   $("#songAlbumId").value = song.album_id || "";
   $("#songMp3").value = ""; $("#songImage").value = "";
   $("#saveSongBtn").textContent = "Update Song";
@@ -448,11 +467,16 @@ async function loadSongsSection() {
   renderSongs(songsData.songs, albumsData.albums);
 }
 
-// ================= 🆕 BULK ADD (50 songs ek saath!) =================
-let bulkItems = [];   // { mp3, image, status, error }
+// ================= BULK ADD =================
+let bulkItems = [];
 
 async function loadBulkSection() {
   const albumsData = await api("/api/albums");
+
+  let albumOptions = '<option value="">— No album —</option>';
+  for (let i = 0; i < albumsData.albums.length; i++) {
+    albumOptions += `<option value="${albumsData.albums[i].id}">${esc(albumsData.albums[i].name)}</option>`;
+  }
 
   content.innerHTML = `
     <h2>Bulk Add Songs</h2>
@@ -460,29 +484,33 @@ async function loadBulkSection() {
 
     <div class="panel">
       <h3>1. Files Choose Karo</h3>
-      <label style="font-size:12px; color:var(--text-3); display:block;">🎵 MP3 Files (multiple select — max 50)</label>
+      <label style="font-size:12px; color:var(--text-3); display:block;">MP3 Files (multiple select — max 50)</label>
       <input type="file" id="bulkMp3" accept="audio/mpeg" multiple style="max-width:100%;">
-      <label style="font-size:12px; color:var(--text-3); display:block; margin-top:10px;">🖼️ Cover Images (optional — filename se match hongi, jaise tere_liye.mp3 + tere_liye.jpg)</label>
+      <label style="font-size:12px; color:var(--text-3); display:block; margin-top:10px;">Cover Images (optional — filename se match, jaise tere_liye.mp3 + tere_liye.jpg)</label>
       <input type="file" id="bulkImages" accept="image/jpeg,image/png,image/webp" multiple style="max-width:100%;">
     </div>
 
     <div class="panel" id="bulkDetails" style="display:none;">
       <h3>2. Details (sab songs pe apply honge)</h3>
-      <input type="text" id="bulkArtist" placeholder="Artist name (optional — khali chhod to filename se)" style="max-width:420px">
+      <input type="text" id="bulkArtist" placeholder="Artist name (optional)" style="max-width:420px">
       <select id="bulkAlbumId" style="max-width:420px;">
-        <option value="">— No album —</option>
-        ${albumsData.albums.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("")}
+        ${albumOptions}
       </select>
-      <button class="btn" id="bulkStartBtn" style="max-width:260px;">🚀 Start Upload</button>
+      <button class="btn" id="bulkStartBtn" style="max-width:260px; margin-top:8px;">Start Upload</button>
       <div id="bulkStatus" class="status"></div>
     </div>
 
     <div class="panel" id="bulkPreview" style="display:none;">
       <h3>3. Preview</h3>
-      <div id="bulkPreviewList"></div>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>File</th><th>Title (auto)</th><th>Image</th><th>Status</th></tr></thead>
+        <tbody id="bulkPreviewList"></tbody>
+      </table>
+      </div>
     </div>
 
-    <button class="btn secondary" onclick="loadSongsSection()">← Back to Songs</button>
+    <button class="btn secondary" onclick="loadSongsSection()">Back to Songs</button>
   `;
 
   $("#bulkMp3").addEventListener("change", buildBulkPreview);
@@ -504,44 +532,41 @@ function buildBulkPreview() {
   if (mp3s.length > 50) {
     $("#bulkDetails").style.display = "none";
     $("#bulkPreview").style.display = "block";
-    previewList.innerHTML = '<p style="color:var(--danger)">❌ Max 50 songs ek batch me! Kam files select karo.</p>';
+    previewList.innerHTML = '<tr><td colspan="5" style="color:var(--danger); text-align:center; padding:20px;">Max 50 songs ek batch me! Kam files select karo.</td></tr>';
     return;
   }
 
-  // Images ko base-name se map karo
   const imgMap = {};
-  images.forEach((img) => {
-    const base = img.name.replace(/\.[^.]+$/, "").toLowerCase();
-    imgMap[base] = img;
-  });
+  for (let i = 0; i < images.length; i++) {
+    const base = images[i].name.replace(/\.[^.]+$/, "").toLowerCase();
+    imgMap[base] = images[i];
+  }
 
-  bulkItems = mp3s.map((mp3) => {
+  bulkItems = [];
+  let previewRows = "";
+  for (let i = 0; i < mp3s.length; i++) {
+    const mp3 = mp3s[i];
     const base = mp3.name.replace(/\.[^.]+$/, "").toLowerCase();
-    return {
-      mp3,
+    const item = {
+      mp3: mp3,
       image: imgMap[base] || null,
       title: titleFromFilename(mp3.name),
       status: "pending"
     };
-  });
+    bulkItems.push(item);
+    previewRows += `
+      <tr id="bulkRow${i}">
+        <td>${i + 1}</td>
+        <td><b>${esc(item.mp3.name)}</b></td>
+        <td>${esc(item.title)}</td>
+        <td>${item.image ? "matched" : '<span style="color:var(--text-3)">—</span>'}</td>
+        <td class="bulk-status"><span class="badge gray">Pending</span></td>
+      </tr>`;
+  }
 
   $("#bulkDetails").style.display = "block";
   $("#bulkPreview").style.display = "block";
-  previewList.innerHTML = `
-    <table>
-      <thead><tr><th>#</th><th>File</th><th>Title (auto)</th><th>Image</th><th>Status</th></tr></thead>
-      <tbody>
-        ${bulkItems.map((item, i) => `
-          <tr id="bulkRow${i}">
-            <td>${i + 1}</td>
-            <td><b>${esc(item.mp3.name)}</b></td>
-            <td>${esc(item.title)}</td>
-            <td>${item.image ? '✅ matched' : '<span style="color:var(--text-3)">—</span>'}</td>
-            <td class="bulk-status"><span class="badge gray">Pending</span></td>
-          </tr>`).join("")}
-      </tbody>
-    </table>
-  `;
+  previewList.innerHTML = previewRows;
 }
 
 async function processBulk() {
@@ -551,31 +576,28 @@ async function processBulk() {
   status.className = "status success";
   status.textContent = "Uploading... band mat karna!";
 
-  let success = 0, failed = 0;
+  let success = 0;
+  let failed = 0;
   const artist = $("#bulkArtist").value.trim();
   const albumId = $("#bulkAlbumId").value || null;
 
-  // Sequential — ek-ek karke (Vercel safe)
   for (let i = 0; i < bulkItems.length; i++) {
     const item = bulkItems[i];
-    const row = $(`#bulkRow${i} .bulk-status`);
-    if (row) row.innerHTML = '<span class="badge gray">⏳ Uploading...</span>';
+    const row = document.querySelector("#bulkRow" + i + " .bulk-status");
+    if (row) row.innerHTML = '<span class="badge gray">Uploading...</span>';
 
     try {
-      // 1) MP3 upload
       const url = await uploadFile(item.mp3, "songs");
 
-      // 2) Image upload (agar matched)
       let image_url = null;
       if (item.image) {
         try {
           image_url = await uploadFile(item.image, "images");
-        } catch (e) {
-          // image fail ho to bhi song add karo — bina image
+        } catch (imgErr) {
+          // image fail ho to bhi song add karo
         }
       }
 
-      // 3) Song save
       await api("/api/songs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -583,33 +605,29 @@ async function processBulk() {
           title: item.title,
           artist: artist || "Unknown Artist",
           album: "",
-          url,
-          image_url,
+          url: url,
+          image_url: image_url,
           album_id: albumId
         })
       });
 
       success++;
-      item.status = "done";
-      if (row) row.innerHTML = '<span class="badge green">✅ Done</span>';
+      if (row) row.innerHTML = '<span class="badge green">Done</span>';
     } catch (e) {
       failed++;
-      item.status = "failed";
-      if (row) row.innerHTML = `<span class="badge red">❌ ${esc(e.message)}</span>`;
+      if (row) row.innerHTML = '<span class="badge red">Failed: ' + esc(e.message) + '</span>';
     }
 
-    // Progress header update
-    status.textContent = `Progress: ${i + 1}/${bulkItems.length} (✅ ${success} | ❌ ${failed})`;
+    status.textContent = "Progress: " + (i + 1) + "/" + bulkItems.length + " (Done: " + success + " | Failed: " + failed + ")";
 
-    // Thoda gap — serverless friendly
     await new Promise((r) => setTimeout(r, 300));
   }
 
   status.className = failed === 0 ? "status success" : "status error";
-  status.textContent = `🎉 DONE! ${success} songs add hue, ${failed} fail hue. App restart me sab dikhengi!`;
+  status.textContent = "DONE! " + success + " songs add hue, " + failed + " fail hue. App restart me sab dikhengi!";
 
   startBtn.disabled = false;
-  startBtn.textContent = "Upload More (refresh list first)";
+  startBtn.textContent = "Upload More";
 }
 
 // ================= ALBUMS =================
@@ -620,6 +638,26 @@ async function loadAlbumsSection() {
   content.innerHTML = skeletonPage();
   const data = await api("/api/albums");
   const albums = data.albums;
+
+  let albumRows = "";
+  for (let i = 0; i < albums.length; i++) {
+    const a = albums[i];
+    const coverHtml = a.cover_url
+      ? `<img src="${esc(a.cover_url)}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--border);">`
+      : `<div style="width:44px;height:44px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">${esc(a.name[0]?.toUpperCase() || "?")}</div>`;
+    const editData = JSON.stringify({ id: a.id, name: a.name }).replace(/'/g, "&#39;");
+    albumRows += `
+      <tr>
+        <td>${coverHtml}</td>
+        <td><b>${esc(a.name)}</b></td>
+        <td><span class="badge gray">${a.song_count} songs</span></td>
+        <td>
+          <button class="btn" style="padding:7px 14px;" onclick="openAlbumDetail(${a.id})">Manage Songs</button>
+          <button class="btn secondary" style="padding:7px 14px;" onclick='startAlbumEdit(${editData})'>Edit</button>
+          <button class="btn danger" style="padding:7px 14px;" onclick="deleteAlbum(${a.id}, '${esc(a.name)}')">Delete</button>
+        </td>
+      </tr>`;
+  }
 
   content.innerHTML = `
     <h2>Albums</h2>
@@ -640,19 +678,8 @@ async function loadAlbumsSection() {
       <div class="table-wrap">
       <table>
         <thead><tr><th style="width:60px;">Cover</th><th>Name</th><th>Songs</th><th style="width:220px;">Actions</th></tr></thead>
-        <tbody>
-        ${albums.length ? albums.map((a) => `
-          <tr>
-            <td>${a.cover_url ? `<img src="${esc(a.cover_url)}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--border);">` : `<div style="width:44px;height:44px;border-radius:8px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">${esc(a.name[0]?.toUpperCase() || "?")}</div>`}</td>
-            <td><b>${esc(a.name)}</b></td>
-            <td><span class="badge gray">${a.song_count} songs</span></td>
-            <td>
-              <button class="btn" style="padding:7px 14px;" onclick="openAlbumDetail(${a.id})">Manage Songs</button>
-              <button class="btn secondary" style="padding:7px 14px;" onclick='startAlbumEdit(${JSON.stringify({ id: a.id, name: a.name })})'>Edit</button>
-              <button class="btn danger" style="padding:7px 14px;" onclick="deleteAlbum(${a.id}, '${esc(a.name)}')">Delete</button>
-            </td>
-          </tr>`).join("") : '<tr><td colspan="4" style="color:var(--text-3); text-align:center; padding:30px;">No albums yet!</td></tr>'}
-        </tbody></table>
+        <tbody>${albumRows || '<tr><td colspan="4" style="color:var(--text-3); text-align:center; padding:30px;">No albums yet!</td></tr>'}</tbody>
+      </table>
       </div>
     </div>
   `;
@@ -727,10 +754,8 @@ async function openAlbumDetail(albumId) {
   currentAlbumDetailId = albumId;
   content.innerHTML = '<h2>Loading...</h2><p class="page-sub">Please wait</p>';
 
-  const [albumsData, songsData] = await Promise.all([
-    api("/api/albums"),
-    api("/api/songs")
-  ]);
+  const albumsData = await api("/api/albums");
+  const songsData = await api("/api/songs");
   const album = albumsData.albums.find((a) => a.id === albumId);
   if (!album) {
     content.innerHTML = '<h2>Album not found</h2>';
@@ -739,6 +764,34 @@ async function openAlbumDetail(albumId) {
   const allSongs = songsData.songs;
   const albumSongs = allSongs.filter((s) => s.album_id === albumId);
   const outsideSongs = allSongs.filter((s) => s.album_id !== albumId);
+
+  let insideRows = "";
+  for (let i = 0; i < albumSongs.length; i++) {
+    const s = albumSongs[i];
+    const coverHtml = s.image_url
+      ? `<img src="${esc(s.image_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">`
+      : `<div style="width:36px;height:36px;border-radius:6px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">${esc(s.title[0]?.toUpperCase() || "?")}</div>`;
+    insideRows += `
+      <tr>
+        <td>${coverHtml}</td>
+        <td><b>${esc(s.title)}</b><br><span style="font-size:12px; color:var(--text-3)">${esc(s.artist)}</span></td>
+        <td><button class="btn danger" style="padding:6px 12px;" onclick="removeSongFromAlbum(${s.id})">Remove</button></td>
+      </tr>`;
+  }
+
+  let outsideRows = "";
+  for (let i = 0; i < outsideSongs.length; i++) {
+    const s = outsideSongs[i];
+    const coverHtml = s.image_url
+      ? `<img src="${esc(s.image_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">`
+      : `<div style="width:36px;height:36px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-3);font-weight:700;">${esc(s.title[0]?.toUpperCase() || "?")}</div>`;
+    outsideRows += `
+      <tr>
+        <td>${coverHtml}</td>
+        <td><b>${esc(s.title)}</b><br><span style="font-size:12px; color:var(--text-3)">${esc(s.artist)}</span></td>
+        <td><button class="btn" style="padding:6px 14px;" onclick="addSongToAlbum(${s.id})">Add</button></td>
+      </tr>`;
+  }
 
   content.innerHTML = `
     <h2>${esc(album.name)}</h2>
@@ -757,16 +810,7 @@ async function openAlbumDetail(albumId) {
       <div class="table-wrap">
       <table>
         <thead><tr><th style="width:50px;">Cover</th><th>Title</th><th>Artist</th><th style="width:110px;">Remove</th></tr></thead>
-        <tbody>
-          ${albumSongs.map((s) => `
-            <tr>
-              <td>${s.image_url
-                ? `<img src="${esc(s.image_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">`
-                : `<div style="width:36px;height:36px;border-radius:6px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;">${esc(s.title[0]?.toUpperCase() || "?")}</div>`}</td>
-              <td><b>${esc(s.title)}</b><br><span style="font-size:12px; color:var(--text-3)">${esc(s.artist)}</span></td>
-              <td><button class="btn danger" style="padding:6px 12px;" onclick="removeSongFromAlbum(${s.id})">Remove</button></td>
-            </tr>`).join("")}
-        </tbody>
+        <tbody>${insideRows}</tbody>
       </table>
       </div>` : '<p style="color:var(--text-3); padding:12px 0;">Is album me abhi koi gaana nahi. Neeche se add karo!</p>'}
     </div>
@@ -777,21 +821,12 @@ async function openAlbumDetail(albumId) {
       <div class="table-wrap">
       <table>
         <thead><tr><th style="width:50px;">Cover</th><th>Title</th><th>Artist</th><th style="width:110px;">Add</th></tr></thead>
-        <tbody>
-          ${outsideSongs.map((s) => `
-            <tr>
-              <td>${s.image_url
-                ? `<img src="${esc(s.image_url)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">`
-                : `<div style="width:36px;height:36px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-3);font-weight:700;">${esc(s.title[0]?.toUpperCase() || "?")}</div>`}</td>
-              <td><b>${esc(s.title)}</b><br><span style="font-size:12px; color:var(--text-3)">${esc(s.artist)}</span></td>
-              <td><button class="btn" style="padding:6px 14px;" onclick="addSongToAlbum(${s.id})">Add</button></td>
-            </tr>`).join("")}
-        </tbody>
+        <tbody>${outsideRows}</tbody>
       </table>
       </div>` : '<p style="color:var(--text-3); padding:12px 0;">Saare songs already is album me hain!</p>'}
     </div>
 
-    <button class="btn secondary" onclick="loadAlbumsSection()">← Back to Albums</button>
+    <button class="btn secondary" onclick="loadAlbumsSection()">Back to Albums</button>
   `;
 
   $("#updateAlbumNameBtn").addEventListener("click", async () => {
@@ -884,7 +919,7 @@ async function loadNotificationsSection() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Send failed");
       status.className = "status success";
-      status.textContent = `Sent to ${data.sent} devices! (${data.failed || 0} failed)`;
+      status.textContent = "Sent to " + data.sent + " devices! (" + (data.failed || 0) + " failed)";
     } catch (e) {
       status.className = "status error";
       status.textContent = "Error: " + e.message;
@@ -907,6 +942,14 @@ async function loadSongsTrackingSection() {
   const data = await api("/api/tracking?range=7");
   live.trackTotals = data.totals;
 
+  let trackRows = "";
+  for (let i = 0; i < data.songTracking.length; i++) {
+    const r = data.songTracking[i];
+    trackRows += `
+      <tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td>${esc(r.artist)}</td>
+      <td><span class="badge green">${r.listens}</span></td><td>${r.unique_listeners}</td></tr>`;
+  }
+
   content.innerHTML = `
     <h2>Songs Tracking</h2>
     <p class="page-sub">Listening activity — last ${data.days} days</p>
@@ -919,12 +962,7 @@ async function loadSongsTrackingSection() {
       <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>Song</th><th>Artist</th><th>Listens</th><th>Unique Listeners</th></tr></thead>
-        <tbody id="trackTableBody">
-          ${data.songTracking.length ? data.songTracking.map((r, i) => `
-            <tr><td>${i + 1}</td><td><b>${esc(r.title)}</b></td><td>${esc(r.artist)}</td>
-            <td><span class="badge green">${r.listens}</span></td><td>${r.unique_listeners}</td></tr>`).join("")
-            : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi listen nahi hua abhi</td></tr>'}
-        </tbody>
+        <tbody>${trackRows || '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi listen nahi hua abhi</td></tr>'}</tbody>
       </table>
       </div>
     </div>
@@ -940,6 +978,27 @@ async function loadUsersTrackingSection() {
   `;
   const data = await api("/api/tracking?range=7");
 
+  let userRows = "";
+  for (let i = 0; i < data.userTracking.length; i++) {
+    const r = data.userTracking[i];
+    let userDisplay;
+    if (r.user_id === "anonymous") {
+      userDisplay = '<span class="badge gray">Guest</span>';
+    } else if (r.name) {
+      userDisplay = `<b>${esc(r.name)}</b><br><span style="font-size:11px; color:var(--text-3)">${esc(r.email)}</span>`;
+    } else if (r.email) {
+      userDisplay = `<b>${esc(r.email)}</b>`;
+    } else {
+      userDisplay = `<code>${esc(r.user_id.slice(0, 12))}...</code>`;
+    }
+    userRows += `
+      <tr><td>${i + 1}</td>
+      <td>${userDisplay}</td>
+      <td><span class="badge green">${r.listens}</span></td>
+      <td>${r.last_active ? new Date(r.last_active).toLocaleString("en-IN") : "—"}</td>
+      <td><span class="badge gray">${r.status}</span></td></tr>`;
+  }
+
   content.innerHTML = `
     <h2>Users Tracking</h2>
     <p class="page-sub">User activity — last ${data.days} days (privacy-safe: sirf counts)</p>
@@ -952,27 +1011,7 @@ async function loadUsersTrackingSection() {
       <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>User</th><th>Listens</th><th>Last Active</th><th>Status</th></tr></thead>
-        <tbody>
-          ${data.userTracking.length ? data.userTracking.map((r, i) => {
-            let userDisplay;
-            if (r.user_id === "anonymous") {
-              userDisplay = '<span class="badge gray">Guest</span>';
-            } else if (r.name) {
-              userDisplay = `<b>${esc(r.name)}</b><br><span style="font-size:11px; color:var(--text-3)">${esc(r.email)}</span>`;
-            } else if (r.email) {
-              userDisplay = `<b>${esc(r.email)}</b>`;
-            } else {
-              userDisplay = `<code>${esc(r.user_id.slice(0, 12))}...</code>`;
-            }
-            return `
-            <tr><td>${i + 1}</td>
-            <td>${userDisplay}</td>
-            <td><span class="badge green">${r.listens}</span></td>
-            <td>${r.last_active ? new Date(r.last_active).toLocaleString("en-IN") : "—"}</td>
-            <td><span class="badge gray">${r.status}</span></td></tr>`;
-          }).join("")
-            : '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi activity nahi abhi</td></tr>'}
-        </tbody>
+        <tbody>${userRows || '<tr><td colspan="5" style="color:var(--text-3); text-align:center; padding:30px;">Koi activity nahi abhi</td></tr>'}</tbody>
       </table>
       </div>
     </div>
@@ -991,18 +1030,23 @@ async function loadPageViewsSection() {
   const pages = data.pages;
   const maxViews = Math.max(...pages.map((p) => p.views), 1);
 
+  let bars = "";
+  for (let i = 0; i < pages.length; i++) {
+    const p = pages[i];
+    bars += `
+      <div class="bar-row">
+        <div class="bar-label">${esc(p.page_name)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.views / maxViews) * 100)}%"></div></div>
+        <div class="bar-value">${p.views}</div>
+      </div>`;
+  }
+
   content.innerHTML = `
     <h2>Page Views</h2>
     <p class="page-sub">Kaunsi screen pe kitni baar gaye users — ads placement ka data</p>
     <div class="panel">
       <h3>Views by Page</h3>
-      ${pages.length ? pages.map((p) => `
-        <div class="bar-row">
-          <div class="bar-label">${esc(p.page_name)}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.round((p.views / maxViews) * 100)}%"></div></div>
-          <div class="bar-value">${p.views}</div>
-        </div>`).join("")
-        : '<p style="color:var(--text-3); text-align:center; padding:30px;">Koi page view logged nahi abhi.</p>'}
+      ${bars || '<p style="color:var(--text-3); text-align:center; padding:30px;">Koi page view logged nahi abhi.</p>'}
     </div>
   `;
 }
@@ -1013,6 +1057,20 @@ async function loadUsersSection() {
   const data = await api("/api/users");
   const users = data.users;
 
+  let userRows = "";
+  for (let i = 0; i < users.length; i++) {
+    const u = users[i];
+    userRows += `
+      <tr>
+        <td>${i + 1}</td>
+        <td><b>${esc(u.name || "—")}</b></td>
+        <td>${esc(u.email || "—")}</td>
+        <td><span class="badge green">${u.likes_count}</span></td>
+        <td><span class="badge gray">${u.playlists_count}</span></td>
+        <td>${new Date(u.created_at).toLocaleDateString("en-IN")}</td>
+      </tr>`;
+  }
+
   content.innerHTML = `
     <h2>Users</h2>
     <p class="page-sub">${users.length} registered users</p>
@@ -1020,18 +1078,8 @@ async function loadUsersSection() {
       <div class="table-wrap">
       <table>
         <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Likes</th><th>Playlists</th><th>Joined</th></tr></thead>
-        <tbody>
-        ${users.length ? users.map((u, i) => `
-          <tr>
-            <td>${i + 1}</td>
-            <td><b>${esc(u.name || "—")}</b></td>
-            <td>${esc(u.email || "—")}</td>
-            <td><span class="badge green">${u.likes_count}</span></td>
-            <td><span class="badge gray">${u.playlists_count}</span></td>
-            <td>${new Date(u.created_at).toLocaleDateString("en-IN")}</td>
-          </tr>`).join("")
-          : '<tr><td colspan="6" style="color:var(--text-3); text-align:center; padding:30px;">No users yet</td></tr>'}
-        </tbody></table>
+        <tbody>${userRows || '<tr><td colspan="6" style="color:var(--text-3); text-align:center; padding:30px;">No users yet</td></tr>'}</tbody>
+      </table>
       </div>
     </div>
   `;
